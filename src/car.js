@@ -69,7 +69,9 @@ export class Car {
     this.steer += (target - this.steer) * Math.min(1, rate * dt);
 
     const surf = world.surfaceAt(this.x, this.y);
-    const gripScale = surf.grip * settings.gripGlobal;
+    // Regen und Schnee kosten zusaetzlich Haftung
+    const weatherGrip = settings.weather === 1 ? 0.86 : settings.weather === 2 ? 0.74 : 1;
+    const gripScale = surf.grip * settings.gripGlobal * weatherGrip;
 
     // ---- Antrieb
     const dv = this.drivetrain.update(dt, ctl, this.vLong);

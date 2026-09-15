@@ -93,7 +93,8 @@ localStorage gespeichert.
   -Rückstellung, Sichtbarkeit von Lenkrad und Pedalen.
 * **Fahrverhalten** – Drift-Intensität, Gegenlenk-Hilfe,
   Stabilitätskontrolle, Gesamt-Grip, Auto-Reset beim Festfahren.
-* **Optik** – Tageszeit (Tag/Abend/Nacht), Laternen und Fenster, Lichtschein,
+* **Optik** – Gebäudehöhe (3D), Wetter, Farbstimmung,
+  Tageszeit (Tag/Abend/Nacht), Laternen und Fenster, Lichtschein,
   Untergrundbeleuchtung, Neon-Pulsieren, Reifenspuren und deren Verblassen,
   Partikelmenge, Bildschütteln, Vignette, Scanlines, Minimap, Scheinwerfer,
   Kamera-Zoom.
@@ -116,6 +117,22 @@ Stadt eignen sich für Donuts.
 ## Grafik
 
 Alles ist prozedural gezeichnet, kein einziges Bild-Asset.
+
+**Häuser mit Höhe**: Jedes Gebäude hat eine eigene Höhe, und die Wände neigen
+sich pro Bild von der Bildmitte weg – derselbe Trick, mit dem GTA 2 seine Stadt
+räumlich wirken lässt. Die Dachflächen liegen als eigene Ebene bereit und werden
+nur versetzt kopiert, die Wände samt Fensterrastern entstehen pro Bild aus
+wenigen Flächen. Dazu Sockelverschattung, Schlagschatten auf die Straße und
+weiche Verschattung rund um den Grundriss. Stärke einstellbar über
+*Gebäudehöhe (3D)*; hohe Wände verdecken das Auto genau wie im Vorbild.
+
+**Wetter**: Klar, Regen oder Schnee. Regen zeichnet Schlieren und Aufschläge,
+Schnee taumelnde Flocken. Bei Regen wird die Lichtebene nach unten verzogen
+noch einmal additiv aufgelegt – das liest sich wie Spiegelungen im Wasserfilm.
+Beides zählt in der Physik mit: Regen kostet 14 % Grip, Schnee 26 %.
+
+**Farbstimmung**: Ein abschließender Durchgang legt kühle Schatten oben und
+warme Lichter unten übereinander, das trennt die Bildebenen sichtbar.
 
 **Dynamisches Licht** (`src/light.js`): Ab Tageszeit *Abend* wird pro Bild eine
 Lichtkarte in Bildschirmgröße aufgebaut und über die Szene multipliziert.
@@ -141,7 +158,8 @@ mit eigenem Schatten in einheitlicher Lichtrichtung. Dazu Straßenlaternen und
 Bäume.
 
 **Effekte**: Reifenspuren aus breitem Abrieb mit dunklem Kern, Rauch als weiche
-Wolken statt Quadrate, Funken beim Aufprall, Staub in der Farbe des Untergrunds.
+Wolken statt Quadrate, Funken beim Aufprall, Staub in der Farbe des Untergrunds,
+wandernde Wellenkämme auf dem Wasser.
 
 ## Fahrphysik
 

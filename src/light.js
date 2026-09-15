@@ -131,6 +131,19 @@ export class LightLayer {
   }
 }
 
+// Nasse Fahrbahn: die Lichtebene noch einmal nach unten verzogen darueber,
+// das liest sich wie eine Spiegelung im Wasserfilm.
+LightLayer.prototype.wetReflection = function (target, alpha) {
+  if (alpha <= 0) return;
+  target.save();
+  target.globalCompositeOperation = 'lighter';
+  target.globalAlpha = alpha;
+  target.drawImage(this.canvas, 0, 5, this.canvas.width, this.canvas.height * 1.08);
+  target.globalAlpha = alpha * 0.6;
+  target.drawImage(this.canvas, 0, 12, this.canvas.width, this.canvas.height * 1.16);
+  target.restore();
+};
+
 function rgba(hex, a) {
   if (hex[0] !== '#') return hex;
   const n = parseInt(hex.slice(1), 16);

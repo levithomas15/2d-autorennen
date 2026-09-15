@@ -357,6 +357,7 @@ function frame(now) {
   }
 
   updateParticles(active ? dt : 0);
+  updateWeather(active ? dt : 0);
 
   const lookX = car.x + car.vxWorld * 3.2, lookY = car.y + car.vyWorld * 3.2;
   const k = 1 - Math.pow(0.0015, dt);
@@ -369,6 +370,90 @@ function frame(now) {
   render();
   input.drawWheel(car.slip, input.handbrake);
   requestAnimationFrame(frame);
+}
+
+// ------------------------------------------------------------------- Wetter
+const drops = [];
+for (let i = 0; i < 300; i++) {
+  drops.push({
+    x: Math.random() * VIEW_W, y: Math.random() * VIEW_H,
+    v: 0.6 + Math.random() * 0.7, sway: Math.random() * Math.PI * 2,
+  });
+}
+const splashes = [];
+
+function updateWeather(dt) {
+  const mode = settings.weather;
+  if (!mode) return;
+  const rain = mode === 1;
+  for (const d of drops) {
+    if (rain) {
+      d.y += (620 + d.v * 260) * dt;
+      d.x -= (110 + d.v * 60) * dt;
+    } else {
+      d.sway += dt * 2.2;
+      d.y += (44 + d.v * 40) * dt;
+      d.x += Math.sin(d.sway) * 22 * dt;
+    }
+    if (d.y > VIEW_H) { d.y -= VIEW_H + 8; d.x = Math.random() * VIEW_W; }
+    if (d.x < -8) d.x += VIEW_W + 8;
+    if (d.x > VIEW_W + 8) d.x -= VIEW_W + 8;
+  }
+  if (rain) {
+    for (let i = 0; i < 3; i++) {
+      splashes.push({ x: Math.random() * VIEW_W, y: Math.random() * VIEW_H, life: 0.22 });
+    }
+  }
+  for (let i = splashes.length - 1; i >= 0; i--) {
+    splashes[i].life -= dt;
+    if (splashes[i].life <= 0) splashes.splice(i, 1);
+  }
+}
+
+// Niederschlag liegt im Bildschirmraum, deshalb ohne Kameratransformation
+function drawWeather() {
+  const mode = settings.weather;
+  if (!mode) return;
+  if (mode === 1) {
+    ctx.strokeStyle = 'rgba(186,212,240,.34)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const d of drops) {
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x + 2.5, d.y - 9);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(200,225,245,.3)';
+    for (const sp of splashes) {
+      const r = (1 - sp.life / 0.22) * 3 + 1;
+      ctx.fillRect(sp.x - r, sp.y, r * 2, 1);
+    }
+  } else {
+    ctx.fillStyle = 'rgba(240,246,255,.75)';
+    for (const d of drops) {
+      const s = d.v > 1.05 ? 2 : 1;
+      ctx.fillRect(Math.round(d.x), Math.round(d.y), s, s);
+    }
+  }
+}
+
+// Farbstimmung: kuehle Schatten oben, warme Lichter unten, leicht mehr Tiefe
+let gradeCache = null;
+function paintGrade() {
+  if (!gradeCache) {
+    gradeCache = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    gradeCache.addColorStop(0, 'rgba(70,110,180,.20)');
+    gradeCache.addColorStop(0.5, 'rgba(128,128,128,.04)');
+    gradeCache.addColorStop(1, 'rgba(255,168,96,.18)');
+  }
+  ctx.save();
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.fillStyle = gradeCache;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgba(255,244,230,.10)';
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------- Rendering
@@ -388,6 +473,8 @@ function render() {
   ctx.scale(z, z);
   ctx.translate(-ox, -oy);
 
+  if (world.hasWater) drawWaterWaves(ox, oy, vw, vh);
+
   for (const p of world.props) {
     if (p.x < ox - 8 || p.y < oy - 8 || p.x > ox + vw + 8 || p.y > oy + vh + 8) continue;
     drawProp(ctx, p);
@@ -401,6 +488,8 @@ function render() {
 
   for (const p of particles) if (p.air) drawParticle(ctx, p);
 
+  if (settings.parallax > 0) drawBuildings(ctx, ox, oy, vw, vh);
+
   for (const p of popups) {
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     drawTextShadow(ctx, p.text, p.x - textWidth(p.text, 1) / 2, p.y, 1, p.color);
@@ -409,6 +498,9 @@ function render() {
   ctx.restore();
 
   if (settings.daytime > 0) paintLights(z, ox, oy);
+
+  drawWeather();
+  if (settings.grade) paintGrade();
 
   if (settings.vignette) {
     const grd = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35,
@@ -460,6 +552,132 @@ function paintLights(z, ox, oy) {
     light.point(car.x, car.y, s.len * 1.15, s.glowColor, 0.8 * pulse);
   }
   light.composite(ctx, AMBIENT[settings.daytime], settings.bloom);
+  if (settings.weather === 1) light.wetReflection(ctx, 0.16);
+}
+
+// Haeuser mit Hoehe: die Waende neigen sich von der Bildmitte weg, genau wie
+// im Vorbild. Die Dachflaeche liegt als eigene Ebene bereit und wird nur
+// versetzt kopiert; die Waende entstehen pro Bild aus wenigen Flaechen.
+function drawBuildings(g, ox, oy, vw, vh) {
+  const camCX = ox + vw / 2, camCY = oy + vh / 2;
+  const k = settings.parallax;
+  const list = [];
+  for (const b of world.buildings) {
+    if (b.x > ox + vw + 80 || b.y > oy + vh + 80 ||
+        b.x + b.w < ox - 80 || b.y + b.h < oy - 80) continue;
+    const px = (b.cx - camCX) / (vw / 2);
+    const py = (b.cy - camCY) / (vh / 2);
+    b._dx = px * b.height * k;
+    b._dy = py * b.height * k;
+    b._d = px * px + py * py;
+    list.push(b);
+  }
+  list.sort((a, b) => b._d - a._d);          // aussen liegende zuerst
+  for (const b of list) drawBuilding(g, b);
+}
+
+function drawBuilding(g, b) {
+  const dx = b._dx, dy = b._dy;
+  const x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h;
+
+  // Sockel: schliesst die Luecke, die entsteht wenn das Dach wegwandert
+  g.fillStyle = b.wallB;
+  g.fillRect(x0, y0, b.w, b.h);
+
+  // senkrechte Wand (links oder rechts)
+  if (Math.abs(dx) > 0.4) {
+    const ex = dx > 0 ? x1 : x0;
+    g.fillStyle = dx > 0 ? b.wallB : b.wallA;
+    g.beginPath();
+    g.moveTo(ex, y0); g.lineTo(ex, y1);
+    g.lineTo(ex + dx, y1 + dy); g.lineTo(ex + dx, y0 + dy);
+    g.closePath(); g.fill();
+    wallWindows(g, b, ex, y0, 0, y1 - y0, dx, dy);
+  }
+  // waagerechte Wand (oben oder unten)
+  if (Math.abs(dy) > 0.4) {
+    const ey = dy > 0 ? y1 : y0;
+    g.fillStyle = dy > 0 ? b.wallB : b.wallA;
+    g.beginPath();
+    g.moveTo(x0, ey); g.lineTo(x1, ey);
+    g.lineTo(x1 + dx, ey + dy); g.lineTo(x0 + dx, ey + dy);
+    g.closePath(); g.fill();
+    wallWindows(g, b, x0, ey, x1 - x0, 0, dx, dy);
+  }
+
+  // Sockelverschattung: unten an der Wand dunkler
+  if (Math.abs(dx) > 0.4 || Math.abs(dy) > 0.4) {
+    g.save();
+    g.globalAlpha = 0.28;
+    g.fillStyle = '#000';
+    if (Math.abs(dx) > 0.4) {
+      const ex = dx > 0 ? x1 : x0;
+      g.beginPath();
+      g.moveTo(ex, y0); g.lineTo(ex, y1);
+      g.lineTo(ex + dx * 0.35, y1 + dy * 0.35); g.lineTo(ex + dx * 0.35, y0 + dy * 0.35);
+      g.closePath(); g.fill();
+    }
+    if (Math.abs(dy) > 0.4) {
+      const ey = dy > 0 ? y1 : y0;
+      g.beginPath();
+      g.moveTo(x0, ey); g.lineTo(x1, ey);
+      g.lineTo(x1 + dx * 0.35, ey + dy * 0.35); g.lineTo(x0 + dx * 0.35, ey + dy * 0.35);
+      g.closePath(); g.fill();
+    }
+    g.restore();
+  }
+
+  // Dachflaeche versetzt kopieren, danach eine Kante fuer klare Silhouette
+  g.drawImage(world.roofCanvas, b.x, b.y, b.w, b.h, b.x + dx, b.y + dy, b.w, b.h);
+  g.strokeStyle = 'rgba(0,0,0,.4)';
+  g.lineWidth = 1;
+  g.strokeRect(Math.round(b.x + dx) + 0.5, Math.round(b.y + dy) + 0.5, b.w - 1, b.h - 1);
+}
+
+// Fensterraster auf der geneigten Wand - zwei Reihen entlang der Neigung
+function wallWindows(g, b, ax, ay, spanX, spanY, dx, dy) {
+  const span = Math.max(Math.abs(spanX), Math.abs(spanY));
+  if (span < 12 || (Math.abs(dx) + Math.abs(dy)) < 3) return;
+  const step = 8;
+  const night = settings.daytime > 0;
+  for (let i = 6; i < span - 4; i += step) {
+    const bx = ax + (spanX ? i : 0);
+    const by = ay + (spanY ? i : 0);
+    for (const f of [0.3, 0.58, 0.86]) {
+      const h = hash2(b.winSeed, i * 7 + f * 100);
+      const on = night && h < b.winLit;
+      const wx = Math.round(bx + dx * f) - 1, wy = Math.round(by + dy * f) - 1;
+      g.fillStyle = on ? '#ffd792' : 'rgba(10,12,20,.55)';
+      g.fillRect(wx, wy, 3, 3);
+      g.fillStyle = on ? 'rgba(255,240,200,.7)' : 'rgba(255,255,255,.10)';
+      g.fillRect(wx, wy, 3, 1);
+    }
+  }
+}
+
+function hash2(a, b) {
+  let t = (a * 374761393 + b * 668265263) | 0;
+  t = (t ^ (t >>> 13)) * 1274126177;
+  return ((t ^ (t >>> 16)) >>> 0) / 4294967296;
+}
+
+// Wellen auf dem Wasser: zwei wandernde Striche je sichtbarer Wasserkachel
+function drawWaterWaves(ox, oy, vw, vh) {
+  const t = performance.now() / 1000;
+  const x0 = Math.max(0, Math.floor(ox / TILE)), x1 = Math.min(world.w, Math.ceil((ox + vw) / TILE));
+  const y0 = Math.max(0, Math.floor(oy / TILE)), y1 = Math.min(world.h, Math.ceil((oy + vh) / TILE));
+  ctx.fillStyle = 'rgba(200,232,252,.16)';
+  for (let ty = y0; ty < y1; ty++) {
+    for (let tx = x0; tx < x1; tx++) {
+      if (world.get(tx, ty) !== T.WATER) continue;
+      const px = tx * TILE, py = ty * TILE;
+      const phase = (tx * 0.7 + ty * 1.3);
+      const a = ((t * 7 + phase * 5) % 16);
+      const b2 = ((t * 5 + phase * 9 + 8) % 16);
+      ctx.fillRect(px + 2 + Math.sin(t * 2 + phase) * 2, py + a, 6, 1);
+      ctx.fillRect(px + 8 + Math.cos(t * 1.6 + phase) * 2, py + b2, 4, 1);
+    }
+  }
 }
 
 function drawUnderglow(g) {

@@ -79,8 +79,11 @@ export class World {
     map.build(this);
     if (opts.tilesOnly) return;
 
+    this.hasWater = this.tiles.includes(T.WATER);
     this.collectBuildings();
+    this.assignBuildingLooks();
     this.canvas = this.render();
+    this.roofCanvas = this.renderRoofs();
     this.skid = this.makeSkidLayer();
   }
 
@@ -191,7 +194,10 @@ export class World {
           h++;
         }
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) seen[this.idx(tx + x, ty + y)] = 1;
-        this.buildings.push({ x: tx * TILE, y: ty * TILE, w: w * TILE, h: h * TILE });
+        this.buildings.push({
+          x: tx * TILE, y: ty * TILE, w: w * TILE, h: h * TILE,
+          cx: tx * TILE + w * TILE / 2, cy: ty * TILE + h * TILE / 2,
+        });
       }
     }
   }
@@ -241,7 +247,7 @@ export class World {
     if (this.map.grid) this.paintGridMarkings(g, this.map.grid);
     this.paintLotMarkings(g);
     for (const d of this.decals) d(g, this);
-    this.paintBuildings(g);
+    this.paintBuildingShadows(g);
     this.placeStreetFurniture();
     this.paintStatics(g);
     this.paintGrain(g);
@@ -504,49 +510,68 @@ export class World {
     }
   }
 
-  // Faux-3D: Das Licht kommt von oben-links, also liegen Sued- und Ostwand
-  // sichtbar da. Beide bekommen Fensterreihen, das Dach Aufbauten.
-  paintBuildings(g) {
-    const ex = 6, ey = 7;
+  // Jedes Haus bekommt Hoehe und feste Farben. Gezeichnet werden die
+  // Waende spaeter pro Bild, weil sie sich mit der Kameraposition neigen.
+  assignBuildingLooks() {
     const P = this.pal;
+    const hScale = this.map.buildHeight ?? 1;
     for (const b of this.buildings) {
-      const roof = this.pick(P.roofs);
-      const wallS = shade(roof, -0.52);
-      const wallE = shade(roof, -0.38);
-      const tall = Math.min(1, (b.w * b.h) / 30000);
-
-      // Schlagschatten auf den Boden
-      g.fillStyle = 'rgba(0,0,0,.38)';
-      g.fillRect(b.x + ex, b.y + ey, b.w, b.h);
-      g.fillStyle = 'rgba(0,0,0,.18)';
-      g.fillRect(b.x + ex + 2, b.y + ey + 2, b.w + 3, b.h + 3);
-
-      // Sued- und Ostwand
-      g.fillStyle = wallS; g.fillRect(b.x, b.y + b.h, b.w, ey);
-      g.fillStyle = wallE; g.fillRect(b.x + b.w, b.y, ex, b.h);
-      g.fillStyle = shade(roof, -0.6); g.fillRect(b.x + b.w, b.y + b.h, ex, ey);
-
-      // Fenster in den Waenden - ein Teil leuchtet
-      const lit = [];
-      for (let x = b.x + 3; x < b.x + b.w - 3; x += 6) {
-        const on = this.rnd() < 0.42;
-        g.fillStyle = on ? '#ffd792' : shade(roof, -0.7);
-        g.fillRect(x, b.y + b.h + 2, 3, 3);
-        if (on) lit.push([x + 1, b.y + b.h + 3]);
+      const area = b.w * b.h;
+      const base = 9 + Math.sqrt(area) * 0.22 + this.rnd() * 10;
+      b.height = Math.max(6, Math.min(52, base * hScale));
+      b.roof = this.pick(P.roofs);
+      b.wallA = shade(b.roof, -0.22);     // von der Seite beleuchtete Wand
+      b.wallB = shade(b.roof, -0.44);     // abgewandte Wand
+      b.winSeed = Math.floor(this.rnd() * 65536);
+      b.winLit = 0.3 + this.rnd() * 0.3;
+      // beleuchtete Fassaden werfen Licht auf die Strasse
+      if (this.rnd() < 0.55) {
+        this.lights.push({ x: b.cx, y: b.y + b.h + 5, r: 40, color: '#ffc477', intensity: 0.45 });
       }
-      for (let y = b.y + 3; y < b.y + b.h - 3; y += 6) {
-        const on = this.rnd() < 0.42;
-        g.fillStyle = on ? '#ffd792' : shade(roof, -0.56);
-        g.fillRect(b.x + b.w + 2, y, 3, 3);
-        if (on) lit.push([b.x + b.w + 3, y + 1]);
+      if (this.rnd() < 0.45) {
+        this.lights.push({ x: b.x + b.w + 5, y: b.cy, r: 40, color: '#ffc477', intensity: 0.4 });
       }
-      // je Gebaeude hoechstens zwei Lichtquellen, sonst wird es zu teuer
-      for (let i = 0; i < Math.min(2, lit.length); i++) {
-        const q = lit[Math.floor(this.rnd() * lit.length)];
-        this.lights.push({ x: q[0], y: q[1], r: 34, color: '#ffc477', intensity: 0.62 });
-      }
+    }
+  }
 
-      // Dachflaeche mit Struktur
+  // Bodenschatten und Verschattung am Sockel - bleibt im Vorab-Rendering
+  paintBuildingShadows(g) {
+    const sx = 0.55, sy = 0.7;           // Richtung des Sonnenschattens
+    for (const b of this.buildings) {
+      const dx = b.height * sx, dy = b.height * sy;
+      g.fillStyle = 'rgba(0,0,0,.34)';
+      g.beginPath();
+      g.moveTo(b.x, b.y);
+      g.lineTo(b.x + b.w, b.y);
+      g.lineTo(b.x + b.w + dx, b.y + dy);
+      g.lineTo(b.x + b.w + dx, b.y + b.h + dy);
+      g.lineTo(b.x + dx, b.y + b.h + dy);
+      g.lineTo(b.x, b.y + b.h);
+      g.closePath();
+      g.fill();
+
+      // weiche Verschattung rund um den Sockel
+      const pad = 10;
+      const grd = g.createLinearGradient(b.x, b.y - pad, b.x, b.y);
+      grd.addColorStop(0, 'rgba(0,0,0,0)');
+      grd.addColorStop(1, 'rgba(0,0,0,.3)');
+      g.fillStyle = grd;
+      g.fillRect(b.x - pad, b.y - pad, b.w + pad * 2, pad);
+      const grd2 = g.createLinearGradient(b.x - pad, 0, b.x, 0);
+      grd2.addColorStop(0, 'rgba(0,0,0,0)');
+      grd2.addColorStop(1, 'rgba(0,0,0,.3)');
+      g.fillStyle = grd2;
+      g.fillRect(b.x - pad, b.y - pad, pad, b.h + pad * 2);
+    }
+  }
+
+  // Dachflaechen auf eigener Ebene, damit sie pro Bild versetzt werden koennen
+  renderRoofs() {
+    const c = document.createElement('canvas');
+    c.width = this.worldW; c.height = this.worldH;
+    const g = c.getContext('2d');
+    for (const b of this.buildings) {
+      const roof = b.roof;
       g.fillStyle = roof;
       g.fillRect(b.x, b.y, b.w, b.h);
       for (let i = 0; i < (b.w * b.h) / 900; i++) {
@@ -554,18 +579,17 @@ export class World {
         g.fillRect(b.x + this.rndInt(0, b.w - 1), b.y + this.rndInt(0, b.h - 1),
                    this.rndInt(2, 7), this.rndInt(2, 5));
       }
-      // Dachkante: oben Licht, unten Schatten
-      g.fillStyle = shade(roof, 0.26); g.fillRect(b.x, b.y, b.w, 2);
-      g.fillStyle = shade(roof, 0.16); g.fillRect(b.x, b.y, 2, b.h);
-      g.fillStyle = shade(roof, -0.28); g.fillRect(b.x, b.y + b.h - 2, b.w, 2);
-      g.fillStyle = shade(roof, -0.2); g.fillRect(b.x + b.w - 2, b.y, 2, b.h);
-
-      this.paintRoofClutter(g, b, roof, tall);
+      g.fillStyle = shade(roof, 0.3); g.fillRect(b.x, b.y, b.w, 2);
+      g.fillStyle = shade(roof, 0.18); g.fillRect(b.x, b.y, 2, b.h);
+      g.fillStyle = shade(roof, -0.3); g.fillRect(b.x, b.y + b.h - 2, b.w, 2);
+      g.fillStyle = shade(roof, -0.22); g.fillRect(b.x + b.w - 2, b.y, 2, b.h);
+      this.paintRoofClutter(g, b, roof);
     }
+    return c;
   }
 
   // Lueftung, Oberlichter, Wassertank, Treppenhaus - alles mit eigenem Schatten
-  paintRoofClutter(g, b, roof, tall) {
+  paintRoofClutter(g, b, roof) {
     const inner = { x: b.x + 4, y: b.y + 4, w: b.w - 8, h: b.h - 8 };
     if (inner.w < 8 || inner.h < 8) return;
     const count = Math.max(1, Math.round((b.w * b.h) / 3400));
@@ -577,39 +601,38 @@ export class World {
       const x = inner.x + this.rndInt(0, Math.max(0, inner.w - w));
       const y = inner.y + this.rndInt(0, Math.max(0, inner.h - h));
 
-      g.fillStyle = 'rgba(0,0,0,.34)';
+      g.fillStyle = 'rgba(0,0,0,.36)';
       g.fillRect(x + 2, y + 3, w, h);
 
-      if (kind < 0.42) {                       // Lueftungsgeraet
+      if (kind < 0.42) {
         g.fillStyle = '#6f7480'; g.fillRect(x, y, w, h);
-        g.fillStyle = '#878d9a'; g.fillRect(x, y, w, 1);
+        g.fillStyle = '#888e9b'; g.fillRect(x, y, w, 1);
         g.fillStyle = '#4b505a';
         for (let k = 2; k < w - 1; k += 3) g.fillRect(x + k, y + 2, 1, Math.max(1, h - 4));
-      } else if (kind < 0.68) {                // Oberlicht
+      } else if (kind < 0.68) {
         g.fillStyle = '#9fb4c4'; g.fillRect(x, y, w, h);
-        g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + 1, y + 1, w - 2, 1);
+        g.fillStyle = 'rgba(255,255,255,.38)'; g.fillRect(x + 1, y + 1, w - 2, 1);
         g.fillStyle = 'rgba(0,0,0,.25)';
         for (let k = 3; k < w - 1; k += 4) g.fillRect(x + k, y, 1, h);
-      } else if (kind < 0.86) {                // Treppenhausaufbau
-        g.fillStyle = shade(roof, -0.3); g.fillRect(x, y, w, h);
-        g.fillStyle = shade(roof, -0.1); g.fillRect(x, y, w, 2);
+      } else if (kind < 0.86) {
+        g.fillStyle = shade(roof, -0.28); g.fillRect(x, y, w, h);
+        g.fillStyle = shade(roof, -0.06); g.fillRect(x, y, w, 2);
         g.fillStyle = '#2a2a33'; g.fillRect(x + 1, y + h - 3, 3, 3);
-      } else {                                 // Wassertank
+      } else {
         const r = Math.min(w, h) / 2;
         g.fillStyle = '#7a5c42';
         g.beginPath(); g.arc(x + r, y + r, r, 0, Math.PI * 2); g.fill();
-        g.fillStyle = '#93705180';
+        g.fillStyle = 'rgba(147,112,81,.6)';
         g.beginPath(); g.arc(x + r - 1, y + r - 1, r * 0.6, 0, Math.PI * 2); g.fill();
       }
     }
 
-    // Dachrand-Aufbauten und Antenne bei grossen Haeusern
-    if (tall > 0.5 && this.rnd() < 0.5) {
+    if (b.height > 28 && this.rnd() < 0.6) {
       const ax = b.x + Math.round(b.w / 2), ay = b.y + Math.round(b.h / 2);
       g.strokeStyle = '#8c8c9c'; g.lineWidth = 1;
       g.beginPath(); g.moveTo(ax, ay); g.lineTo(ax + 6, ay - 9); g.stroke();
       g.fillStyle = '#ff5a4a'; g.fillRect(ax + 5, ay - 11, 2, 2);
-      this.lights.push({ x: ax + 6, y: ay - 10, r: 14, color: '#ff5a4a', intensity: 0.6 });
+      this.lights.push({ x: ax + 6, y: ay - 10, r: 16, color: '#ff5a4a', intensity: 0.7 });
     }
   }
 

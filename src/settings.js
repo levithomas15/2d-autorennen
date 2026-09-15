@@ -39,6 +39,13 @@ export const SCHEMA = [
   {
     group: 'OPTIK',
     items: [
+      { key: 'parallax', label: 'GEBAEUDEHOEHE (3D)', type: 'range',
+        min: 0, max: 1.2, step: 0.05, def: 0.65,
+        help: 'Wie stark sich die Hauswaende von der Bildmitte wegneigen.' },
+      { key: 'weather', label: 'WETTER', type: 'choice',
+        options: ['KLAR', 'REGEN', 'SCHNEE'], def: 0,
+        help: 'Regen und Schnee kosten spuerbar Grip.' },
+      { key: 'grade', label: 'FARBSTIMMUNG', type: 'toggle', def: true },
       { key: 'daytime', label: 'TAGESZEIT', type: 'choice',
         options: ['TAG', 'ABEND', 'NACHT'], def: 1,
         help: 'Abend und Nacht schalten die dynamische Beleuchtung ein.' },
