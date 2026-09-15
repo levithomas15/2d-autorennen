@@ -94,6 +94,31 @@ export class Input {
     };
     hook('pGas', 'gas'); hook('pBrake', 'brake');
     hook('pHand', 'hand'); hook('pClutch', 'clutch');
+
+    this.pedals = [
+      { el: document.getElementById('pGas'), kind: 'gas', label: 'GAS' },
+      { el: document.getElementById('pBrake'), kind: 'brake', label: 'BREMSE' },
+      { el: document.getElementById('pClutch'), kind: 'clutch', label: 'KUPPLUNG' },
+    ].filter((p) => p.el);
+    this.leverEl = document.getElementById('pHand');
+    this.pedalState = '';
+  }
+
+  // Pedalerie und Handbremshebel neu zeichnen, wenn sich etwas geaendert hat
+  paintControls() {
+    const key = [this.touch.gas || this.throttle, this.touch.brake || this.brake,
+                 this.touch.clutch || this.clutch, this.touch.hand || this.handbrake].join('|');
+    if (key === this.pedalState) return;
+    this.pedalState = key;
+
+    const pressedOf = { gas: this.throttle > 0, brake: this.brake > 0, clutch: this.clutch > 0 };
+    for (const p of this.pedals) {
+      if (p.el.offsetParent === null) continue;      // ausgeblendet
+      paintPedal(p.el.getContext('2d'), p.el.width, p.el.height, p.kind, p.label, pressedOf[p.kind]);
+    }
+    if (this.leverEl) {
+      paintLever(this.leverEl.getContext('2d'), this.leverEl.width, this.leverEl.height, this.handbrake > 0);
+    }
   }
 
   // Schalthebel: nach oben ziehen = hochschalten, nach unten = runter
@@ -148,6 +173,8 @@ export class Input {
     toggle(document.getElementById('shifter'), s.shifterMode !== 0);
     const dn = document.getElementById('shiftDown'), up = document.getElementById('shiftUp');
     toggle(dn, manual); toggle(up, manual);
+    this.pedalState = '';          // erzwingt ein Neuzeichnen
+    this.paintControls();
   }
 
   update(dt) {
@@ -175,6 +202,8 @@ export class Input {
     this.brake = brk ? 1 : 0;
     this.handbrake = hb ? 1 : 0;
     this.clutch = cl ? 1 : 0;
+
+    this.paintControls();
   }
 
   takeShift() { const r = this.shiftRequest; this.shiftRequest = 0; return r; }
@@ -225,6 +254,109 @@ export class Input {
     g.fillStyle = '#ffd96b'; g.fillRect(-3, -R - 6, 6, 10);
     g.restore();
   }
+}
+
+// ------------------------------------------------------- Pedalerie zeichnen
+// Ein Pedal besteht aus Bodenplatte, Schwenkarm und Trittflaeche mit Riffelung.
+// Beim Treten wandert die Flaeche nach unten und der Arm wird kuerzer.
+const PEDAL_TINT = {
+  gas: ['#3f7a45', '#66c06f'],
+  brake: ['#7a3a35', '#d4584c'],
+  clutch: ['#39507a', '#6e97d8'],
+};
+
+function paintPedal(g, W, H, kind, label, pressed) {
+  g.clearRect(0, 0, W, H);
+  const [dark, bright] = PEDAL_TINT[kind] || PEDAL_TINT.brake;
+  const travel = pressed ? H * 0.11 : 0;
+  const padW = W * 0.78, padH = H * 0.46;
+  const padX = (W - padW) / 2, padY = H * 0.30 + travel;
+
+  // Bodenplatte und Lagerbock
+  g.fillStyle = 'rgba(12,12,20,.62)';
+  roundRect(g, W * 0.08, H * 0.04, W * 0.84, H * 0.92, 10); g.fill();
+  g.fillStyle = '#23233a';
+  roundRect(g, W * 0.3, H * 0.06, W * 0.4, H * 0.12, 4); g.fill();
+
+  // Schwenkarm
+  g.strokeStyle = '#4a4a66';
+  g.lineWidth = Math.max(4, W * 0.14);
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(W / 2, H * 0.13);
+  g.lineTo(W / 2, padY + padH * 0.2);
+  g.stroke();
+
+  // Trittflaeche
+  const grd = g.createLinearGradient(0, padY, 0, padY + padH);
+  grd.addColorStop(0, pressed ? bright : '#4d4d66');
+  grd.addColorStop(1, pressed ? dark : '#2b2b42');
+  g.fillStyle = grd;
+  roundRect(g, padX, padY, padW, padH, 7); g.fill();
+  g.strokeStyle = pressed ? bright : '#6a6a90';
+  g.lineWidth = 2;
+  roundRect(g, padX, padY, padW, padH, 7); g.stroke();
+
+  // Riffelung des Gummis
+  g.strokeStyle = pressed ? 'rgba(0,0,0,.45)' : 'rgba(0,0,0,.4)';
+  g.lineWidth = 2;
+  for (let i = 1; i < 5; i++) {
+    const y = padY + (padH / 5) * i;
+    g.beginPath(); g.moveTo(padX + 6, y); g.lineTo(padX + padW - 6, y); g.stroke();
+  }
+  g.fillStyle = 'rgba(255,255,255,.12)';
+  roundRect(g, padX + 4, padY + 3, padW - 8, 3, 2); g.fill();
+
+  // Beschriftung unter dem Pedal
+  g.fillStyle = pressed ? bright : '#9a9ab8';
+  g.font = `bold ${Math.round(W * (label.length > 6 ? 0.135 : 0.17))}px "Courier New", monospace`;
+  g.textAlign = 'center';
+  g.fillText(label, W / 2, H * 0.94);
+}
+
+// Handbremse als Hebel: angezogen kippt er nach oben
+function paintLever(g, W, H, pulled) {
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = 'rgba(12,12,20,.62)';
+  roundRect(g, W * 0.06, H * 0.12, W * 0.88, H * 0.82, 10); g.fill();
+
+  // Konsole
+  g.fillStyle = '#23233a';
+  roundRect(g, W * 0.2, H * 0.62, W * 0.6, H * 0.22, 6); g.fill();
+
+  const px = W * 0.5, py = H * 0.7;
+  const ang = pulled ? -1.15 : -0.5;
+  const len = H * 0.46;
+  const ex = px + Math.cos(ang) * len, ey = py + Math.sin(ang) * len;
+
+  g.strokeStyle = '#5a5a7c';
+  g.lineWidth = Math.max(5, W * 0.13);
+  g.lineCap = 'round';
+  g.beginPath(); g.moveTo(px, py); g.lineTo(ex, ey); g.stroke();
+  g.strokeStyle = '#3a3a55';
+  g.lineWidth = Math.max(2, W * 0.05);
+  g.beginPath(); g.moveTo(px, py); g.lineTo(ex, ey); g.stroke();
+
+  // Griff
+  g.fillStyle = pulled ? '#ff6a4a' : '#2f2f48';
+  g.beginPath(); g.arc(ex, ey, W * 0.15, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = pulled ? '#ffb199' : '#6d6d94';
+  g.lineWidth = 2; g.stroke();
+
+  g.fillStyle = pulled ? '#ff6a4a' : '#9a9ab8';
+  g.font = `bold ${Math.round(W * 0.115)}px "Courier New", monospace`;
+  g.textAlign = 'center';
+  g.fillText('HANDBREMSE', W / 2, H * 0.97);
+}
+
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
 }
 
 // Zeiger am Element festhalten. Schlaegt das fehl, darf die Bedienung
