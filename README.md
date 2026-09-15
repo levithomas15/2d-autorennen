@@ -26,9 +26,14 @@ npx http-server -p 8080 .
 ## Veröffentlichen
 
 `.github/workflows/pages.yml` stellt die Seite bei jedem Push auf den
-Standard-Branch zusammen und veröffentlicht sie über GitHub Pages. Der Workflow
-schaltet Pages beim ersten Lauf selbst frei, es ist also keine Einstellung von
-Hand nötig. Kopiert werden nur `index.html`, `style.css`, `src/` und `media/`.
+Standard-Branch zusammen und veröffentlicht sie über GitHub Pages. Kopiert
+werden nur `index.html`, `style.css`, `src/` und `media/`.
+
+**Einmalig nötig:** unter *Settings → Pages → Build and deployment* als *Source*
+**GitHub Actions** auswählen. Ohne diese Einstellung darf der Workflow die
+Pages-Seite nicht selbst anlegen (`Resource not accessible by integration`).
+Danach unter *Actions → GitHub Pages → Run workflow* einmal starten – alle
+weiteren Pushes veröffentlichen automatisch.
 
 Eigene Domain: eine Datei `CNAME` mit dem Hostnamen (z. B. `drift.example.com`)
 im Repo-Wurzelverzeichnis anlegen – der Workflow übernimmt sie automatisch.

@@ -28,9 +28,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Pages vorbereiten
+        id: pages
+        continue-on-error: true
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
+      # Pages laesst sich nur freischalten, wenn der Workflow Schreibrechte hat.
+      # Sonst genuegt einmalig die Einstellung im Repository.
+      - name: Hinweis, falls Pages noch nicht freigeschaltet ist
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::error::GitHub Pages ist fuer dieses Repository noch nicht freigeschaltet."
+          echo "Einmalig setzen: Settings -> Pages -> Build and deployment -> Source: GitHub Actions"
+          echo "Danach: Actions -> GitHub Pages -> Run workflow"
+          exit 1
 
       - name: Seite zusammenstellen
         run: |
