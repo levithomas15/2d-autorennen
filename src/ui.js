@@ -163,8 +163,8 @@ export class Menu {
     // haeufig genutzte Einstellungen direkt hier
     const quick = el('div', 'setGroup');
     quick.appendChild(el('h3', '', 'SCHNELLEINSTELLUNG'));
-    for (const key of ['view', 'daytime', 'weather', 'shifterMode', 'driftIntensity',
-                       'carDepth', 'parallax', 'zoom']) {
+    for (const key of ['view', 'uiScale', 'daytime', 'weather', 'shifterMode',
+                       'driftIntensity', 'carDepth', 'parallax', 'zoom']) {
       const item = findItem(key);
       if (item) quick.appendChild(this.settingRow(item));
     }

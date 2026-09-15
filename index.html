@@ -24,21 +24,25 @@
       <canvas id="wheel" width="220" height="220"></canvas>
     </div>
 
-    <!-- Handbremshebel und Pedalerie in echter Anordnung: Kupplung, Bremse, Gas -->
-    <div id="handbrakeBox">
-      <canvas class="lever" id="pHand" width="132" height="200"></canvas>
-    </div>
-
-    <div id="pedals">
-      <canvas id="pedalBox" width="460" height="300"></canvas>
-    </div>
-
-    <div id="shifterWrap">
-      <button class="shiftBtn" id="shiftUp">+</button>
-      <div id="shifter">
-        <div id="shiftKnob"><span id="gearReadout">1</span></div>
+    <!-- Rechte Seite: Schalthebel oben, darunter Handbremse und Pedalerie.
+         Der Block ordnet sich selbst, damit nichts von Hand positioniert
+         werden muss, wenn die Groessen sich aendern. -->
+    <div id="rightControls">
+      <div id="shifterWrap">
+        <button class="shiftBtn" id="shiftUp">+</button>
+        <div id="shifter">
+          <div id="shiftKnob"><span id="gearReadout">1</span></div>
+        </div>
+        <button class="shiftBtn" id="shiftDown">&minus;</button>
       </div>
-      <button class="shiftBtn" id="shiftDown">&minus;</button>
+      <div id="pedalRow">
+        <div id="handbrakeBox">
+          <canvas class="lever" id="pHand" width="132" height="200"></canvas>
+        </div>
+        <div id="pedals">
+          <canvas id="pedalBox" width="460" height="300"></canvas>
+        </div>
+      </div>
     </div>
   </div>
 

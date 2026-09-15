@@ -67,6 +67,7 @@ const menu = new Menu({
   onChange: (key) => {
     if (key === 'driftIntensity' || key === 'gripGlobal') refitCar();
     if (key === 'pixelSnap') resize();
+    if (key === 'uiScale') applyUiScale();
     if (key === 'shifterMode' || key === 'clutch' || key === 'showWheel' || key === 'showPedals') {
       input.syncVisibility();
       car.drivetrain.reset();
@@ -109,6 +110,7 @@ const menu = new Menu({
   onPlay: () => {
     state.running = true;
     document.getElementById('controls').classList.add('on');
+    applyUiScale();
     input.syncVisibility();
     sfx.start();
   },
@@ -144,8 +146,14 @@ function resize() {
   screen.style.width = w + 'px';
   screen.style.height = h + 'px';
 }
+// Groesse der Bedienelemente aus den Einstellungen uebernehmen
+function applyUiScale() {
+  document.getElementById('controls').style.setProperty('--ui', settings.uiScale);
+}
+
 addEventListener('resize', resize);
 resize();
+applyUiScale();
 
 // Auf Touchgeraeten soll das Bedienen der Steuerung nicht die Seite bewegen:
 // kein Wischen, kein Zoomen, kein Kontextmenue. Im Menue bleibt Scrollen moeglich.

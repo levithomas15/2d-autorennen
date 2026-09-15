@@ -32,44 +32,61 @@ body {
 }
 
 /* ------------------------------------------------ Lenkrad, Pedale, Schaltung */
-#controls { position: fixed; inset: 0; pointer-events: none; display: none; }
+/* --ui skaliert alle Bedienelemente; die Grundgroessen richten sich nach der
+   kleineren Bildschirmseite (vmin), sonst wird alles auf einem quer
+   gehaltenen Handy riesig. */
+#controls {
+  position: fixed; inset: 0; pointer-events: none; display: none;
+  --ui: 1;
+  --wheel: calc(min(168px, 26vmin) * var(--ui));
+  --pedW: calc(min(230px, 38vmin) * var(--ui));
+  --pedH: calc(min(150px, 25vmin) * var(--ui));
+  --levW: calc(min(74px, 12.5vmin) * var(--ui));
+  --levH: calc(min(104px, 17vmin) * var(--ui));
+  --shfW: calc(min(58px, 10vmin) * var(--ui));
+  --gap: min(10px, 1.6vmin);
+}
 #controls.on { display: block; }
 
 #wheelBox {
-  position: absolute; left: 18px; bottom: 18px;
-  width: 168px; height: 168px;
+  position: absolute;
+  left: max(10px, 1.4vmin); bottom: max(10px, 1.4vmin);
+  width: var(--wheel); height: var(--wheel);
   pointer-events: auto; cursor: grab; touch-action: none;
 }
 #wheelBox:active { cursor: grabbing; }
 #wheel { width: 100%; height: 100%; display: block; }
 
-#pedals {
-  position: absolute; right: 16px; bottom: 12px;
-  pointer-events: auto;
+#rightControls {
+  position: absolute;
+  right: max(10px, 1.4vmin); bottom: max(8px, 1.2vmin);
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: var(--gap);
+  pointer-events: none;
 }
+#rightControls > * { pointer-events: auto; }
+#pedalRow { display: flex; align-items: flex-end; gap: var(--gap); }
+
+#pedals { pointer-events: auto; }
 #pedalBox {
   display: block;
-  width: 230px; height: 150px;
+  width: var(--pedW); height: var(--pedH);
   cursor: pointer; touch-action: none;
 }
 
-#handbrakeBox {
-  position: absolute; right: 254px; bottom: 12px;
-  pointer-events: auto;
-}
+#handbrakeBox { pointer-events: auto; }
 .lever {
-  width: 74px; height: 104px;
+  width: var(--levW); height: var(--levH);
   display: block;
   cursor: pointer; touch-action: none;
 }
 
 #shifterWrap {
-  position: absolute; right: 18px; bottom: 172px;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
   pointer-events: auto;
 }
 #shifter {
-  width: 58px; height: 84px;
+  width: var(--shfW); height: calc(var(--shfW) * 1.45);
   border-radius: 10px;
   border: 2px solid #4a4a66;
   background: rgba(20,20,32,.72);
@@ -78,14 +95,14 @@ body {
 }
 #shifter.grab { cursor: grabbing; border-color: #ffd96b; }
 #shiftKnob {
-  width: 40px; height: 40px; border-radius: 50%;
+  width: calc(var(--shfW) * 0.68); height: calc(var(--shfW) * 0.68); border-radius: 50%;
   background: #2f2f48; border: 2px solid #6d6d94;
   display: flex; align-items: center; justify-content: center;
   font: bold 18px "Courier New", monospace; color: #ffd96b;
   transition: transform .12s ease-out;
 }
 .shiftBtn {
-  width: 58px; height: 26px; border-radius: 7px;
+  width: var(--shfW); height: calc(var(--shfW) * 0.45); border-radius: 7px;
   border: 2px solid #4a4a66; background: rgba(20,20,32,.72);
   color: #cfcfe4; font: bold 14px "Courier New", monospace; cursor: pointer;
 }
@@ -259,14 +276,6 @@ button.choice.on { background: #ffd96b; border-color: #ffd96b; color: #17111f; }
 .help .setGroup p { margin-bottom: 3px; }
 
 @media (max-width: 680px) {
-  #wheelBox { width: 118px; height: 118px; left: 10px; bottom: 10px; }
-  #pedalBox { width: 168px; height: 110px; }
-  #pedals { right: 8px; bottom: 6px; }
-  .lever { width: 58px; height: 84px; }
-  #handbrakeBox { right: 182px; bottom: 6px; }
-  #shifterWrap { right: 8px; bottom: 124px; }
-  #shifter { width: 46px; height: 62px; }
-  .shiftBtn { width: 46px; }
   .brand { font-size: 15px; }
   #menuBody { padding: 12px; }
 }

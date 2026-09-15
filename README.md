@@ -130,8 +130,9 @@ localStorage gespeichert.
 
 ## Einstellungen
 
-* **Steuerung** – Gangschaltung, Kupplung, Lenkrad-Empfindlichkeit und
-  -Rückstellung, Sichtbarkeit von Lenkrad und Pedalen.
+* **Steuerung** – Gangschaltung, Kupplung, Größe der Bedienelemente,
+  Lenkrad-Empfindlichkeit und -Rückstellung, Sichtbarkeit von Lenkrad und
+  Pedalen.
 * **Fahrverhalten** – Drift-Intensität, Gegenlenk-Hilfe,
   Stabilitätskontrolle, Gesamt-Grip, Auto-Reset beim Festfahren.
 * **Optik** – Bild einrasten, Gebäudehöhe (3D), Wetter, Farbstimmung,
