@@ -124,7 +124,7 @@ localStorage gespeichert.
   -Rückstellung, Sichtbarkeit von Lenkrad und Pedalen.
 * **Fahrverhalten** – Drift-Intensität, Gegenlenk-Hilfe,
   Stabilitätskontrolle, Gesamt-Grip, Auto-Reset beim Festfahren.
-* **Optik** – Gebäudehöhe (3D), Wetter, Farbstimmung,
+* **Optik** – Bild einrasten, Gebäudehöhe (3D), Wetter, Farbstimmung,
   Tageszeit (Tag/Abend/Nacht), Laternen und Fenster, Lichtschein,
   Untergrundbeleuchtung, Neon-Pulsieren, Reifenspuren und deren Verblassen,
   Partikelmenge, Bildschütteln, Vignette, Scanlines, Minimap, Scheinwerfer,
@@ -177,6 +177,14 @@ damit der Schein die dunklen Flächen nicht flach aufhellt.
 statt 480 × 270). Die Kacheln der Welt bleiben dadurch gleich grob, aber
 Fahrzeuge, Hindernisse, Licht und Niederschlag haben doppelt so viele
 Bildpunkte zur Verfügung.
+
+**Ruhiges Bild**: Der Kameraausschnitt rastet auf ganze Bildpunkte ein – tastet
+man die Welt an gebrochenen Positionen ab, zittert bei jeder Bewegung das
+gesamte Kachelbild. Die Vorausschau der Kamera wird zusätzlich geglättet, sonst
+schaukelt sie im Drift mit dem Geschwindigkeitsvektor hin und her. Mit der
+Einstellung *Bild einrasten* wird die Anzeige auf ein ganzzahliges Vielfaches
+vergrößert (schmale Ränder, dafür absolut ruhig); ausgeschaltet füllt das Bild
+das Fenster.
 
 **Fahrzeuge**: Der Umriss entsteht als Pfad aus einem Breitenprofil je Modell –
 vom kantigen MUSCLE bis zum keilförmigen HYPER – und wird in klaren Farbstufen

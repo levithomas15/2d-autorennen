@@ -39,6 +39,8 @@ export const SCHEMA = [
   {
     group: 'OPTIK',
     items: [
+      { key: 'pixelSnap', label: 'BILD EINRASTEN', type: 'toggle', def: true,
+        help: 'Ganzzahlige Vergroesserung - ruhigeres Bild, dafuer schmale Raender.' },
       { key: 'parallax', label: 'GEBAEUDEHOEHE (3D)', type: 'range',
         min: 0, max: 1.2, step: 0.05, def: 0.65,
         help: 'Wie stark sich die Hauswaende von der Bildmitte wegneigen.' },

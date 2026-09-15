@@ -36,7 +36,7 @@ let mini = minimapCanvas(world);
 const car = new Car(world.spawn.x, world.spawn.y, currentSpec());
 car.reset(world.spawn.x, world.spawn.y, world.spawn.h);
 
-const cam = { x: car.x, y: car.y, shake: 0 };
+const cam = { x: car.x, y: car.y, lookX: 0, lookY: 0, shake: 0 };
 const particles = [];
 const popups = [];
 let skidPrev = null;
@@ -64,6 +64,7 @@ const menu = new Menu({
   settings, garage,
   onChange: (key) => {
     if (key === 'driftIntensity' || key === 'gripGlobal') refitCar();
+    if (key === 'pixelSnap') resize();
     if (key === 'shifterMode' || key === 'clutch' || key === 'showWheel' || key === 'showPedals') {
       input.syncVisibility();
       car.drivetrain.reset();
@@ -92,19 +93,36 @@ function loadMap(id) {
   particles.length = 0; popups.length = 0;
   loseCombo();
   car.reset(world.spawn.x, world.spawn.y, world.spawn.h);
-  cam.x = car.x; cam.y = car.y;
+  cam.x = car.x; cam.y = car.y; cam.lookX = 0; cam.lookY = 0;
   state.cones = 0;
   say(world.map.name);
 }
 
 // ---------------------------------------------------------------- Skalierung
 function resize() {
-  const s = Math.max(1, Math.floor(Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H) * 2) / 2);
-  screen.style.width = VIEW_W * s + 'px';
-  screen.style.height = VIEW_H * s + 'px';
+  let w, h;
+  const k = Math.floor(Math.min(innerWidth / CW, innerHeight / CH));
+  if (settings.pixelSnap && k >= 1) {
+    // ganzzahlige Vergroesserung: jeder Bildpunkt ist gleich gross, nichts flimmert
+    w = CW * k; h = CH * k;
+  } else {
+    const f = Math.min(innerWidth / CW, innerHeight / CH);
+    w = Math.round(CW * f); h = Math.round(CH * f);
+  }
+  screen.style.width = w + 'px';
+  screen.style.height = h + 'px';
 }
 addEventListener('resize', resize);
 resize();
+
+// Auf Touchgeraeten soll das Bedienen der Steuerung nicht die Seite bewegen:
+// kein Wischen, kein Zoomen, kein Kontextmenue. Im Menue bleibt Scrollen moeglich.
+const inMenu = (el) => !!(el && el.closest && el.closest('#menu'));
+addEventListener('touchmove', (e) => { if (!inMenu(e.target)) e.preventDefault(); }, { passive: false });
+addEventListener('gesturestart', (e) => e.preventDefault());
+addEventListener('gesturechange', (e) => e.preventDefault());
+addEventListener('contextmenu', (e) => { if (!inMenu(e.target)) e.preventDefault(); });
+addEventListener('dblclick', (e) => { if (!inMenu(e.target)) e.preventDefault(); });
 
 // --------------------------------------------------------------- Tasteneingabe
 input.onKey = (code) => {
@@ -136,7 +154,7 @@ function cycleCar() {
 
 function resetCar() {
   car.reset(world.spawn.x, world.spawn.y, world.spawn.h);
-  cam.x = car.x; cam.y = car.y;
+  cam.x = car.x; cam.y = car.y; cam.lookX = 0; cam.lookY = 0;
   loseCombo();
   say('RESET');
 }
@@ -365,10 +383,14 @@ function frame(now) {
   updateParticles(active ? dt : 0);
   updateWeather(active ? dt : 0);
 
-  const lookX = car.x + car.vxWorld * 3.2, lookY = car.y + car.vyWorld * 3.2;
+  // Vorausschau erst glaetten - im Drift schwenkt der Geschwindigkeitsvektor
+  // so schnell, dass die Kamera sonst hin und her schaukelt.
+  const lk = 1 - Math.pow(0.12, dt);
+  cam.lookX += (car.vxWorld * 3.2 - cam.lookX) * lk;
+  cam.lookY += (car.vyWorld * 3.2 - cam.lookY) * lk;
   const k = 1 - Math.pow(0.0015, dt);
-  cam.x += (lookX - cam.x) * k;
-  cam.y += (lookY - cam.y) * k;
+  cam.x += (car.x + cam.lookX - cam.x) * k;
+  cam.y += (car.y + cam.lookY - cam.y) * k;
   cam.shake *= Math.pow(0.02, dt);
   state.flash = Math.max(0, state.flash - dt);
   state.messageTime = Math.max(0, state.messageTime - dt);
@@ -468,8 +490,11 @@ function render() {
   const vw = VIEW_W / z, vh = VIEW_H / z;
   const shx = cam.shake ? (Math.random() - 0.5) * cam.shake : 0;
   const shy = cam.shake ? (Math.random() - 0.5) * cam.shake : 0;
-  const ox = clamp(cam.x - vw / 2 + shx, 0, Math.max(0, world.worldW - vw));
-  const oy = clamp(cam.y - vh / 2 + shy, 0, Math.max(0, world.worldH - vh));
+  // Auf ganze Bildpunkte einrasten: wird die Welt an gebrochenen Positionen
+  // abgetastet, zittert bei jeder Bewegung das gesamte Kachelbild.
+  const snap = z * RS;
+  const ox = Math.round(clamp(cam.x - vw / 2 + shx, 0, Math.max(0, world.worldW - vw)) * snap) / snap;
+  const oy = Math.round(clamp(cam.y - vh / 2 + shy, 0, Math.max(0, world.worldH - vh)) * snap) / snap;
 
   ctx.clearRect(0, 0, CW, CH);
   ctx.drawImage(world.canvas, ox, oy, vw, vh, 0, 0, CW, CH);
@@ -880,5 +905,5 @@ function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 requestAnimationFrame(frame);
 
 // Debug-Zugriff aus der Konsole: __dbg.car, __dbg.state, __dbg.settings
-window.__dbg = { car, state, input, settings, garage, menu, MAPS, loadMap,
+window.__dbg = { car, state, input, settings, garage, menu, MAPS, loadMap, cam,
   get world() { return world; } };

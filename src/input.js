@@ -56,7 +56,7 @@ export class Input {
       return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
     };
     box.addEventListener('pointerdown', (e) => {
-      box.setPointerCapture(e.pointerId);
+      capture(box, e);
       this.dragging = true;
       this.dragStart = angleOf(e);
       this.dragBase = this.wheelAngle;
@@ -83,7 +83,7 @@ export class Input {
         e.preventDefault();
         this.touch[name] = v;
         el.classList.toggle('down', v);
-        if (v) el.setPointerCapture?.(e.pointerId);
+        if (v) capture(el, e);
       };
       el.addEventListener('pointerdown', set(true));
       el.addEventListener('pointerup', set(false));
@@ -106,7 +106,7 @@ export class Input {
     let startY = 0, fired = false;
 
     box.addEventListener('pointerdown', (e) => {
-      box.setPointerCapture(e.pointerId);
+      capture(box, e);
       startY = e.clientY; fired = false;
       box.classList.add('grab');
       e.preventDefault();
@@ -225,6 +225,12 @@ export class Input {
     g.fillStyle = '#ffd96b'; g.fillRect(-3, -R - 6, 6, 10);
     g.restore();
   }
+}
+
+// Zeiger am Element festhalten. Schlaegt das fehl, darf die Bedienung
+// trotzdem weiterlaufen - sonst bliebe das Element beim Ziehen haengen.
+function capture(el, e) {
+  try { el.setPointerCapture?.(e.pointerId); } catch { /* Zeiger nicht mehr aktiv */ }
 }
 
 function toggle(el, on) { if (el) el.style.display = on ? '' : 'none'; }
