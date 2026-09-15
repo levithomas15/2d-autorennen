@@ -7,6 +7,7 @@ import {
   carById, buildSpec, statBars, upgradeCost,
 } from './cars.js';
 import { buyCar, buyUpgrade, buyGlow, setPaint, saveGarage } from './garage.js';
+import { makeCarPreview } from './car.js';
 import { MAPS, mapById } from './maps.js';
 import { World, minimapCanvas } from './world.js';
 
@@ -399,25 +400,17 @@ function flash(node) {
   node.classList.add('nope');
 }
 
-// kleines Vorschaubild des Autos fuer Liste und Tuning-Kopf
+// Vorschaubild: dasselbe Sprite wie im Spiel, nur vergroessert
 function carThumb(car, paint, scale = 2) {
+  const spec = buildSpec(car, { paint }, { driftIntensity: 1 });
+  const sprite = makeCarPreview(spec);
   const c = document.createElement('canvas');
-  c.width = car.len * scale; c.height = car.wid * scale;
+  c.width = sprite.width * scale; c.height = sprite.height * scale;
   c.className = 'thumb';
-  c.style.width = car.len * scale * 2 + 'px';
-  c.style.height = car.wid * scale * 2 + 'px';
+  c.style.width = sprite.width * scale * 2 + 'px';
+  c.style.height = sprite.height * scale * 2 + 'px';
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = false;
-  g.scale(scale, scale);
-  const body = paint || car.color;
-  g.fillStyle = body;
-  g.fillRect(0, 1, car.len, car.wid - 2);
-  g.fillRect(1, 0, car.len - 2, car.wid);
-  g.fillStyle = '#1a1f2b';
-  g.fillRect(Math.round(car.len * 0.3), 1, Math.round(car.len * 0.4), car.wid - 2);
-  g.fillStyle = car.stripe;
-  g.fillRect(Math.round(car.len * 0.36), Math.floor(car.wid / 2) - 1, Math.round(car.len * 0.28), 2);
-  g.fillStyle = '#ffe9a8';
-  g.fillRect(car.len - 2, 2, 2, 2); g.fillRect(car.len - 2, car.wid - 4, 2, 2);
+  g.drawImage(sprite, 0, 0, c.width, c.height);
   return c;
 }

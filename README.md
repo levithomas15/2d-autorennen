@@ -93,9 +93,10 @@ localStorage gespeichert.
   -Rückstellung, Sichtbarkeit von Lenkrad und Pedalen.
 * **Fahrverhalten** – Drift-Intensität, Gegenlenk-Hilfe,
   Stabilitätskontrolle, Gesamt-Grip, Auto-Reset beim Festfahren.
-* **Optik** – Untergrundbeleuchtung, Neon-Pulsieren, Reifenspuren und deren
-  Verblassen, Partikelmenge, Bildschütteln, Vignette, Scanlines, Minimap,
-  Scheinwerfer, Kamera-Zoom.
+* **Optik** – Tageszeit (Tag/Abend/Nacht), Laternen und Fenster, Lichtschein,
+  Untergrundbeleuchtung, Neon-Pulsieren, Reifenspuren und deren Verblassen,
+  Partikelmenge, Bildschütteln, Vignette, Scanlines, Minimap, Scheinwerfer,
+  Kamera-Zoom.
 * **Audio** – Gesamtlautstärke, Motor, Reifen.
 
 Alles wirkt sofort und wird gespeichert.
@@ -111,6 +112,36 @@ Alles wirkt sofort und wird gespeichert.
 
 Die große Arena in der Kartenmitte ist zum freien Üben da, die Parkplätze in der
 Stadt eignen sich für Donuts.
+
+## Grafik
+
+Alles ist prozedural gezeichnet, kein einziges Bild-Asset.
+
+**Dynamisches Licht** (`src/light.js`): Ab Tageszeit *Abend* wird pro Bild eine
+Lichtkarte in Bildschirmgröße aufgebaut und über die Szene multipliziert.
+Lichtquellen sind Straßenlaternen, erleuchtete Fenster, Flutlichtmasten,
+Antennenbefeuerung, die Scheinwerfer (weicher Kegel aus mehreren Keilen),
+Bremslichter und das Neon unter dem Auto. Lichter und Umgebungslicht liegen auf
+getrennten Ebenen – nur die Lichtebene wird additiv als Schein darübergelegt,
+damit der Schein die dunklen Flächen nicht flach aufhellt.
+
+**Fahrzeuge**: Jedes Modell hat ein eigenes Breitenprofil und damit eine eigene
+Silhouette – vom kantigen MUSCLE bis zum keilförmigen HYPER. Dazu Dach in
+Wagenfarbe, Front- und Heckscheibe, Seitenscheiben, Spiegel, Heckflügel,
+Lichtkanten, Schlagschatten und vier Räder, von denen die vorderen mitlenken
+und deren Felgen bei durchdrehenden Reifen aufblitzen. Bremslichter leuchten
+beim Bremsen auf.
+
+**Umgebung**: Asphalt bekommt Körnung, Risse, Flicken und Kanaldeckel,
+Bürgersteige Plattenfugen, Parkflächen Stellplatzmarkierungen, Wasser
+Wellenkämme, Eis Glanzstreifen. Gebäude werden mit sichtbarer Süd- und Ostwand
+extrudiert, bekommen Fensterreihen (ein Teil beleuchtet) und Dachaufbauten:
+Lüftungsgeräte, Oberlichter, Treppenhäuser, Wassertanks und Antennen – jeweils
+mit eigenem Schatten in einheitlicher Lichtrichtung. Dazu Straßenlaternen und
+Bäume.
+
+**Effekte**: Reifenspuren aus breitem Abrieb mit dunklem Kern, Rauch als weiche
+Wolken statt Quadrate, Funken beim Aufprall, Staub in der Farbe des Untergrunds.
 
 ## Fahrphysik
 
@@ -144,6 +175,7 @@ Stadt eignen sich für Donuts.
 | `src/world.js` | Kacheln, Bau-Werkzeuge, Vorab-Rendering, Kollisionsgeometrie |
 | `src/maps.js` | die sechs Karten und ihre Generatoren |
 | `src/input.js` | Tastatur, Lenkrad, Pedale, Schalthebel |
+| `src/light.js` | Dynamische Beleuchtung, Lichtkarte und Schein |
 | `src/audio.js` | Prozeduraler Motor-, Reifen- und Crash-Sound |
 | `src/font.js` | 3×5-Pixel-Font fürs HUD |
 

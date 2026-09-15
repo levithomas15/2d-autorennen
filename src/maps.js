@@ -189,6 +189,16 @@ function buildPass(w) {
     g.stroke(); g.setLineDash([]);
   });
 
+  // Laternen an den Kehren, damit der Pass nachts befahrbar bleibt
+  for (const [x, y] of [[18, 102], [68, 82], [14, 60], [70, 40], [26, 20], [48, 8], [44, 124]]) {
+    w.addStatic('lamp', x * TILE + 8, (y - 7) * TILE + 8);
+    w.addStatic('lamp', x * TILE + 8, (y + 7) * TILE + 8);
+  }
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b2 = pts[i];
+    w.addStatic('lamp', ((a[0] + b2[0]) / 2) * TILE + 8, ((a[1] + b2[1]) / 2) * TILE + 8);
+  }
+
   // Leitpfosten entlang der Fahrbahnkante
   w.decals.push((g) => {
     for (let ty = 0; ty < w.h; ty++) {
@@ -297,6 +307,12 @@ function buildStadium(w) {
         g.fillRect(px - 56 + x * 8, py + 22 * TILE + y * 8, 8, 8);
       }
   });
+
+  // Flutlichtmasten auf der Bande
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + 0.2;
+    w.addStatic('flood', (cx + Math.cos(a) * 39) * TILE + 8, (cy + Math.sin(a) * 39) * TILE + 8);
+  }
 
   for (const [ox, r, n] of [[-19, 9, 16], [19, 9, 16], [0, 30, 30]]) {
     for (let i = 0; i < n; i++) {

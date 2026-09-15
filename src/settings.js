@@ -39,6 +39,13 @@ export const SCHEMA = [
   {
     group: 'OPTIK',
     items: [
+      { key: 'daytime', label: 'TAGESZEIT', type: 'choice',
+        options: ['TAG', 'ABEND', 'NACHT'], def: 1,
+        help: 'Abend und Nacht schalten die dynamische Beleuchtung ein.' },
+      { key: 'cityLights', label: 'LATERNEN UND FENSTER', type: 'toggle', def: true,
+        dep: (s) => s.daytime > 0 },
+      { key: 'bloom', label: 'LICHTSCHEIN', type: 'range', min: 0, max: 0.6, step: 0.05, def: 0.25,
+        dep: (s) => s.daytime > 0 },
       { key: 'underglow', label: 'UNTERGRUNDBELEUCHTUNG', type: 'toggle', def: true,
         help: 'Zeigt das Neon unter getunten Autos (in der Garage kaufen).' },
       { key: 'glowPulse', label: 'NEON PULSIEREN', type: 'toggle', def: true },

@@ -13,7 +13,7 @@ export const GLOW_COLORS = [
 
 export const CARS = [
   {
-    id: 'drifter', name: 'DRIFTER', price: 0,
+    id: 'drifter', shape: 'coupe', spoiler: false, wheel: 6, name: 'DRIFTER', price: 0,
     blurb: 'AUSGEWOGEN - GUTER EINSTIEG',
     color: '#e03e3e', stripe: '#f6e3c8',
     mass: 1150, inertia: 1250, caF: -5.2, caR: -4.6,
@@ -23,7 +23,7 @@ export const CARS = [
     gears: [3.32, 2.13, 1.54, 1.21, 1.00, 0.84], final: 3.9,
   },
   {
-    id: 'muscle', name: 'MUSCLE', price: 9000,
+    id: 'muscle', shape: 'muscle', spoiler: false, wheel: 7, name: 'MUSCLE', price: 9000,
     blurb: 'SCHWER, BRUTALES DREHMOMENT',
     color: '#2f6fd0', stripe: '#eaeaf2',
     mass: 1520, inertia: 1780, caF: -5.0, caR: -4.8,
@@ -33,7 +33,7 @@ export const CARS = [
     gears: [2.97, 1.78, 1.30, 1.00, 0.74], final: 3.55,
   },
   {
-    id: 'tuner', name: 'TUNER', price: 14000,
+    id: 'tuner', shape: 'hatch', spoiler: true, wheel: 5, name: 'TUNER', price: 14000,
     blurb: 'LEICHT, DREHFREUDIG, DIREKT',
     color: '#33c07a', stripe: '#1b2a24',
     mass: 980, inertia: 1020, caF: -5.6, caR: -5.2,
@@ -43,7 +43,7 @@ export const CARS = [
     gears: [3.58, 2.30, 1.70, 1.34, 1.06, 0.87], final: 4.3,
   },
   {
-    id: 'slideking', name: 'SLIDEKING', price: 22000,
+    id: 'slideking', shape: 'drift', spoiler: true, wheel: 6, name: 'SLIDEKING', price: 22000,
     blurb: 'HECK KOMMT VON ALLEIN - PROFIS',
     color: '#f2f2f6', stripe: '#ff7a1a',
     mass: 1060, inertia: 1080, caF: -6.0, caR: -4.2,
@@ -53,7 +53,7 @@ export const CARS = [
     gears: [3.48, 2.20, 1.60, 1.25, 1.00, 0.82], final: 4.1,
   },
   {
-    id: 'hyper', name: 'HYPER', price: 40000,
+    id: 'hyper', shape: 'super', spoiler: true, wheel: 7, name: 'HYPER', price: 40000,
     blurb: 'EXTREM SCHNELL, VIEL GRIP',
     color: '#ffd23f', stripe: '#1b1b24',
     mass: 1320, inertia: 1400, caF: -5.8, caR: -5.6,
@@ -137,6 +137,9 @@ export function buildSpec(car, tune, settings) {
     name: car.name,
     body: t.paint || car.color,
     stripe: car.stripe,
+    shape: car.shape,
+    spoiler: car.spoiler,
+    wheel: car.wheel,
     glow: !!t.glow,
     glowColor: t.glowColor || GLOW_COLORS[0],
 

@@ -9,12 +9,14 @@ import { Input } from './input.js';
 import { Sfx } from './audio.js';
 import { Menu } from './ui.js';
 import { drawTextShadow, textWidth } from './font.js';
+import { LightLayer, AMBIENT } from './light.js';
 
 const VIEW_W = 480, VIEW_H = 270;
 
 const screen = document.getElementById('screen');
 const ctx = screen.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+const light = new LightLayer(VIEW_W, VIEW_H);
 
 const settings = Settings.load();
 const garage = loadGarage();
@@ -32,6 +34,7 @@ const cam = { x: car.x, y: car.y, shake: 0 };
 const particles = [];
 const popups = [];
 let skidPrev = null;
+let lastCtl = null;   // letzte Fahrereingabe, fuer Brems- und Ruecklicht
 
 const state = {
   score: 0, pending: 0, multiplier: 1,
@@ -245,15 +248,18 @@ function paintSkids() {
     if (settings.skidmarks) {
       const g = world.skid.ctx;
       g.lineCap = 'round';
-      g.lineWidth = 2.5;
-      g.strokeStyle = `rgba(14,12,16,${Math.min(0.7, 0.26 + intensity * 0.4)})`;
       for (let i = 0; i < wheels.length; i++) {
         const w = wheels[i];
         if (!w.rear && intensity < 0.55) continue;
         const p = skidPrev && skidPrev[i];
-        if (p && Math.hypot(w.x - p.x, w.y - p.y) < 30) {
-          g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(w.x, w.y); g.stroke();
-        }
+        if (!p || Math.hypot(w.x - p.x, w.y - p.y) >= 30) continue;
+        // breiter, blasser Abrieb und darin ein dunkler Kern
+        g.lineWidth = 3.2;
+        g.strokeStyle = `rgba(18,16,20,${Math.min(0.34, 0.1 + intensity * 0.2)})`;
+        g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(w.x, w.y); g.stroke();
+        g.lineWidth = 1.6;
+        g.strokeStyle = `rgba(10,9,12,${Math.min(0.62, 0.22 + intensity * 0.36)})`;
+        g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(w.x, w.y); g.stroke();
       }
     }
     if (Math.random() < Math.min(1, intensity * 1.6) * settings.particles) {
@@ -309,6 +315,7 @@ function frame(now) {
       clutch: settings.shifterMode === 2 && settings.clutch ? input.clutch : 0,
       mode,
     };
+    lastCtl = ctl;
 
     const shift = input.takeShift();
     if (shift && mode === 'man') {
@@ -388,14 +395,9 @@ function render() {
   for (const p of particles) if (!p.air) drawParticle(ctx, p);
 
   if (settings.underglow && car.spec.glow) drawUnderglow(ctx);
-  if (settings.headlights) drawHeadlights(ctx);
 
-  ctx.save();
-  ctx.globalAlpha = 0.32; ctx.fillStyle = '#000';
-  ctx.translate(car.x + 2, car.y + 3); ctx.rotate(car.heading);
-  ctx.fillRect(-car.spec.len / 2, -car.spec.wid / 2, car.spec.len, car.spec.wid);
-  ctx.restore();
-  car.draw(ctx);
+  car.drawShadow(ctx);
+  car.draw(ctx, lastCtl);
 
   for (const p of particles) if (p.air) drawParticle(ctx, p);
 
@@ -405,6 +407,8 @@ function render() {
     ctx.globalAlpha = 1;
   }
   ctx.restore();
+
+  if (settings.daytime > 0) paintLights(z, ox, oy);
 
   if (settings.vignette) {
     const grd = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35,
@@ -425,6 +429,39 @@ function render() {
   drawHud();
 }
 
+// Lichtkarte aufbauen: Laternen, Fenster, Scheinwerfer, Brems- und Neonlicht
+function paintLights(z, ox, oy) {
+  const vw = VIEW_W / z, vh = VIEW_H / z;
+  light.begin();
+  light.setTransform(z, ox, oy);
+
+  if (settings.cityLights) {
+    for (const L of world.lights) {
+      if (L.x < ox - L.r || L.y < oy - L.r || L.x > ox + vw + L.r || L.y > oy + vh + L.r) continue;
+      light.point(L.x, L.y, L.r, L.color, L.intensity);
+    }
+  }
+
+  const s = car.spec;
+  const cs = Math.cos(car.heading), sn = Math.sin(car.heading);
+  // schwaches Eigenlicht, damit das Auto im Dunkeln lesbar bleibt
+  light.point(car.x, car.y, s.len * 1.7, '#aab6de', 0.34);
+  if (settings.headlights) {
+    const bx = car.x + cs * s.len * 0.45, by = car.y + sn * s.len * 0.45;
+    light.cone(bx, by, car.heading, 78, '#ffeec4', 0.9);
+    light.point(bx, by, 16, '#ffeec4', 0.5);
+  }
+  const braking = lastCtl && (lastCtl.brake > 0 || lastCtl.handbrake > 0);
+  const rx = car.x - cs * s.len * 0.5, ry = car.y - sn * s.len * 0.5;
+  light.point(rx, ry, braking ? 22 : 12, '#ff3b2e', braking ? 0.95 : 0.35);
+
+  if (settings.underglow && s.glow) {
+    const pulse = settings.glowPulse ? 0.8 + 0.2 * Math.sin(performance.now() / 260) : 1;
+    light.point(car.x, car.y, s.len * 1.15, s.glowColor, 0.8 * pulse);
+  }
+  light.composite(ctx, AMBIENT[settings.daytime], settings.bloom);
+}
+
 function drawUnderglow(g) {
   const s = car.spec;
   const pulse = settings.glowPulse ? 0.78 + 0.22 * Math.sin(performance.now() / 260) : 1;
@@ -440,47 +477,63 @@ function drawUnderglow(g) {
   g.restore();
 }
 
-function drawHeadlights(g) {
-  const cs = Math.cos(car.heading), sn = Math.sin(car.heading);
-  const bx = car.x + cs * (car.spec.len * 0.5), by = car.y + sn * (car.spec.len * 0.5);
-  const len = 56, spread = 0.36;
-  const grd = g.createRadialGradient(bx, by, 2, bx, by, len);
-  grd.addColorStop(0, 'rgba(255,238,180,.16)');
-  grd.addColorStop(0.55, 'rgba(255,232,165,.07)');
-  grd.addColorStop(1, 'rgba(255,230,160,0)');
-  g.save();
-  g.globalCompositeOperation = 'lighter';
-  g.fillStyle = grd;
-  g.beginPath();
-  g.moveTo(bx, by);
-  g.lineTo(bx + Math.cos(car.heading - spread) * len, by + Math.sin(car.heading - spread) * len);
-  g.lineTo(bx + Math.cos(car.heading + spread) * len, by + Math.sin(car.heading + spread) * len);
-  g.closePath(); g.fill();
-  g.restore();
+// weiche Wolke je Farbe, einmal vorgerendert
+const puffCache = new Map();
+function puffSprite(color) {
+  let c = puffCache.get(color);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(16, 16, 1, 16, 16, 16);
+  grd.addColorStop(0, hexA(color, 0.85));
+  grd.addColorStop(0.45, hexA(color, 0.42));
+  grd.addColorStop(1, hexA(color, 0));
+  g.fillStyle = grd; g.fillRect(0, 0, 32, 32);
+  puffCache.set(color, c);
+  return c;
 }
 
 function drawParticle(g, p) {
   const a = Math.max(0, p.life / p.max);
-  g.globalAlpha = a * (p.air ? 0.45 : 0.9);
-  g.fillStyle = p.color;
   const r = Math.max(1, p.r);
-  g.fillRect(Math.round(p.x - r), Math.round(p.y - r), Math.round(r * 2), Math.round(r * 2));
+  if (p.air) {
+    g.globalAlpha = a * 0.5;
+    g.drawImage(puffSprite(p.color), p.x - r * 1.6, p.y - r * 1.6, r * 3.2, r * 3.2);
+  } else {
+    g.globalAlpha = Math.min(1, a * 1.3);
+    g.fillStyle = p.color;
+    g.fillRect(Math.round(p.x - r), Math.round(p.y - r), Math.round(r * 2), Math.round(r * 2));
+  }
   g.globalAlpha = 1;
 }
 
 function drawProp(g, p) {
   const x = Math.round(p.x), y = Math.round(p.y);
   const down = p.hit > 0;
+
+  g.fillStyle = 'rgba(0,0,0,.36)';
+  g.beginPath();
+  g.ellipse(x + 2, y + 2, down ? 5 : 4, down ? 3 : 3, 0, 0, Math.PI * 2);
+  g.fill();
+
   if (p.type === 'cone') {
-    g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(x - 2, y + 1, 5, 2);
-    g.fillStyle = down ? '#b8552a' : '#ff8a3c';
-    g.fillRect(x - 2, y - 2, 5, 4);
-    g.fillStyle = '#f2f2f6'; g.fillRect(x - 2, y - 1, 5, 1);
+    if (down) {                                   // umgefahren: liegt flach
+      g.fillStyle = '#c4622f'; g.fillRect(x - 4, y - 1, 8, 3);
+      g.fillStyle = '#e9e9f0'; g.fillRect(x, y - 1, 2, 3);
+      return;
+    }
+    g.fillStyle = '#d96a24'; g.fillRect(x - 3, y - 3, 7, 7);      // Fuss
+    g.fillStyle = '#ff8a3c'; g.fillRect(x - 2, y - 3, 5, 6);      // Kegel
+    g.fillStyle = '#ffab6d'; g.fillRect(x - 2, y - 3, 2, 6);      // Lichtkante
+    g.fillStyle = '#f4f4fa'; g.fillRect(x - 2, y - 1, 5, 2);      // Reflexband
   } else {
-    g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(x - 3, y + 2, 7, 2);
-    g.fillStyle = down ? '#6d7a86' : '#9aa7b4';
+    g.fillStyle = down ? '#5d6a76' : '#8996a4';
     g.fillRect(x - 3, y - 3, 7, 7);
+    g.fillStyle = down ? '#6d7a86' : '#a7b4c2';
+    g.fillRect(x - 3, y - 3, 3, 7);
     g.fillStyle = '#d24a3a'; g.fillRect(x - 3, y - 1, 7, 2);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x + 2, y - 3, 1, 7);
   }
 }
 

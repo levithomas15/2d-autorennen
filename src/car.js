@@ -21,6 +21,7 @@ export class Car {
   applySpec(spec) {
     this.spec = spec;
     this.sprite = makeCarSprite(spec);
+    this.shadowSprite = makeShadowSprite(spec);
     this.wheelbaseF = 1.05;
     this.wheelbaseR = 1.45;
     this.drivetrain.setSpec(spec);
@@ -199,12 +200,48 @@ export class Car {
     return out;
   }
 
-  draw(g) {
-    const sp = this.sprite;
+  // Schatten in Richtung des globalen Lichteinfalls
+  drawShadow(g, offX = 2.5, offY = 3.5, alpha = 0.34) {
+    const sp = this.shadowSprite;
     g.save();
-    g.translate(Math.round(this.x), Math.round(this.y));
+    g.globalAlpha = alpha;
+    g.translate(this.x + offX, this.y + offY);
     g.rotate(this.heading);
     g.drawImage(sp, -sp.width / 2, -sp.height / 2);
+    g.restore();
+  }
+
+  draw(g, ctl) {
+    const s = this.spec;
+    const braking = ctl && (ctl.brake > 0 || ctl.handbrake > 0);
+    g.save();
+    g.translate(this.x, this.y);
+    g.rotate(this.heading);
+
+    // Raeder zuerst, damit die Karosserie sie teilweise ueberdeckt
+    const fx = s.len * 0.30, rx = -s.len * 0.32, wy = s.wid * 0.5 - 0.5;
+    const ww = s.wheel, wh = 3;
+    for (const [ox, oy, turn] of [[fx, -wy, 1], [fx, wy, 1], [rx, -wy, 0], [rx, wy, 0]]) {
+      g.save();
+      g.translate(ox, oy);
+      if (turn) g.rotate(this.steer);
+      g.fillStyle = '#0c0c10';
+      g.fillRect(-ww / 2, -wh / 2, ww, wh);
+      // Felge blitzt auf, solange sich das Rad dreht
+      g.fillStyle = this.wheelSpin > 0.3 ? '#8a8a9c' : '#3a3a46';
+      g.fillRect(-ww / 2 + 1, -wh / 2 + 1, ww - 2, 1);
+      g.restore();
+    }
+
+    const sp = this.sprite;
+    g.drawImage(sp, -sp.width / 2, -sp.height / 2);
+
+    // Bremslichter
+    if (braking) {
+      g.fillStyle = '#ff4433';
+      g.fillRect(-s.len / 2, -s.wid / 2 + 2, 2, 2);
+      g.fillRect(-s.len / 2, s.wid / 2 - 4, 2, 2);
+    }
     g.restore();
   }
 }
@@ -212,42 +249,162 @@ export class Car {
 function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
 // --------------------------------------------------------------- Pixel-Sprite
-function makeCarSprite(spec) {
+// Halbe Karosseriebreite entlang der Laengsachse (0 = Heck, 1 = Front).
+// Jede Form hat dadurch eine eigene Silhouette.
+const PROFILES = {
+  coupe:  (t) => 0.78 + 0.22 * Math.sin(Math.PI * Math.pow(t, 0.85)) - 0.16 * Math.pow(t, 3.2),
+  muscle: (t) => 0.88 + 0.12 * Math.sin(Math.PI * t) - 0.08 * Math.pow(t, 4),
+  hatch:  (t) => 0.84 + 0.16 * Math.sin(Math.PI * Math.pow(t, 0.7)) - 0.12 * Math.pow(t, 3),
+  drift:  (t) => 0.76 + 0.24 * Math.sin(Math.PI * Math.pow(t, 0.9)) - 0.20 * Math.pow(t, 2.6),
+  super:  (t) => 0.70 + 0.30 * Math.sin(Math.PI * Math.pow(t, 1.15)) - 0.22 * Math.pow(t, 2.2),
+};
+
+function bodyMask(spec) {
+  const L = spec.len, W = spec.wid;
+  const prof = PROFILES[spec.shape] || PROFILES.coupe;
+  const cy = W / 2;
+  const rows = [];
+  for (let x = 0; x < L; x++) {
+    const t = (x + 0.5) / L;
+    const hw = Math.max(1, (W / 2) * Math.min(1, prof(t)));
+    rows.push([Math.round(cy - hw), Math.round(cy + hw)]);   // [y0, y1)
+  }
+  return rows;
+}
+
+export function makeCarSprite(spec) {
   const L = spec.len, W = spec.wid;
   const c = document.createElement('canvas');
   c.width = L; c.height = W;
   const g = c.getContext('2d');
   const body = spec.body;
-  const dark = mix(body, '#000', 0.45);
-  const lite = mix(body, '#fff', 0.22);
+  const rows = bodyMask(spec);
 
-  for (let y = 0; y < W; y++) {
-    const t = Math.abs((y + 0.5) / W - 0.5) * 2;
-    const inset = t > 0.82 ? 2 : t > 0.6 ? 1 : 0;
+  const dark = mix(body, '#000', 0.5);
+  const mid = mix(body, '#000', 0.22);
+  const lite = mix(body, '#fff', 0.18);
+  const glass = '#2b3546';   // dunkles Blaugrau fuer die Scheiben
+
+  // Karosserie mit Licht von oben-links
+  for (let x = 0; x < L; x++) {
+    const [y0, y1] = rows[x];
     g.fillStyle = body;
-    g.fillRect(inset, y, L - inset * 2, 1);
+    g.fillRect(x, y0, 1, y1 - y0);
+    g.fillStyle = lite; g.fillRect(x, y0, 1, 1);                 // Lichtkante oben
+    g.fillStyle = dark; g.fillRect(x, y1 - 1, 1, 1);             // Schattenkante unten
   }
-  g.fillStyle = dark; g.fillRect(2, W - 1, L - 4, 1);
-  g.fillStyle = lite; g.fillRect(2, 0, L - 4, 1);
 
-  const cabX = Math.round(L * 0.3), cabW = Math.round(L * 0.4);
-  g.fillStyle = '#1a1f2b';
-  g.fillRect(cabX, 1, cabW, W - 2);
-  g.fillStyle = '#3d4d63';
-  g.fillRect(cabX + cabW - 3, 2, 2, W - 4);
-  g.fillRect(cabX + 1, 2, 2, W - 4);
+  // Front- und Heckabschluss abdunkeln
+  for (let x = 0; x < 2; x++) {
+    const [y0, y1] = rows[x];
+    g.fillStyle = mid; g.fillRect(x, y0 + 1, 1, Math.max(0, y1 - y0 - 2));
+  }
+
+  // Kabine: koerperfarbenes Dach, davor und dahinter je eine Scheibe
+  const cabX = Math.round(L * 0.28), cabW = Math.round(L * 0.42);
+  const roofCol = mix(body, '#000', 0.16);
+  for (let x = cabX; x < cabX + cabW; x++) {
+    const [y0, y1] = rows[x];
+    g.fillStyle = roofCol;
+    g.fillRect(x, y0 + 1, 1, Math.max(0, y1 - y0 - 2));
+  }
+  const inset = W > 12 ? 2 : 1;
+  const winY = (x) => {
+    const [y0, y1] = rows[x];
+    return [y0 + inset, Math.max(1, y1 - y0 - inset * 2)];
+  };
+  const [wy0, wh0] = winY(cabX + cabW - 3);
+  g.fillStyle = '#4a6182';   // Frontscheibe, heller als hinten
+  g.fillRect(cabX + cabW - 3, wy0, 3, wh0);
+  g.fillStyle = 'rgba(255,255,255,.22)';
+  g.fillRect(cabX + cabW - 3, wy0, 1, wh0);
+  const [wy1, wh1] = winY(cabX + 1);
+  g.fillStyle = glass;                                         // Heckscheibe
+  g.fillRect(cabX + 1, wy1, 2, wh1);
+  // Seitenscheiben als dunkle Linien entlang der Dachkante
+  g.fillStyle = mix(glass, '#000', 0.25);
+  for (let x = cabX + 3; x < cabX + cabW - 3; x++) {
+    const [y0, y1] = rows[x];
+    g.fillRect(x, y0 + 1, 1, 1);
+    g.fillRect(x, y1 - 2, 1, 1);
+  }
+
+  // Dachstreifen
   g.fillStyle = spec.stripe;
-  g.fillRect(cabX + 3, Math.floor(W / 2) - 1, cabW - 7, 2);
+  g.fillRect(cabX + 3, Math.floor(W / 2) - 1, Math.max(2, cabW - 7), 2);
 
-  g.fillStyle = '#ffe9a8';
-  g.fillRect(L - 2, 2, 2, 2); g.fillRect(L - 2, W - 4, 2, 2);
-  g.fillStyle = '#c4282a';
-  g.fillRect(0, 2, 2, 2); g.fillRect(0, W - 4, 2, 2);
+  // Motorhaube: Lufteinlass und Fugen
+  const hoodX = cabX + cabW + 1;
+  g.fillStyle = mix(body, '#000', 0.3);
+  g.fillRect(hoodX, Math.floor(W / 2) - 2, Math.max(2, L - hoodX - 4), 1);
+  g.fillRect(hoodX, Math.floor(W / 2) + 1, Math.max(2, L - hoodX - 4), 1);
+  g.fillStyle = mix(body, '#000', 0.45);
+  g.fillRect(cabX - 1, rows[cabX][0] + 1, 1, Math.max(0, rows[cabX][1] - rows[cabX][0] - 2));
+  g.fillRect(cabX + cabW, rows[cabX + cabW][0] + 1, 1,
+             Math.max(0, rows[cabX + cabW][1] - rows[cabX + cabW][0] - 2));
 
-  g.fillStyle = '#101014';
-  const wr = Math.round(L * 0.3);
-  g.fillRect(wr + 1, 0, 4, 1); g.fillRect(wr + 1, W - 1, 4, 1);
-  g.fillRect(L - wr - 5, 0, 4, 1); g.fillRect(L - wr - 5, W - 1, 4, 1);
+  // Aussenspiegel
+  g.fillStyle = dark;
+  g.fillRect(cabX + cabW - 2, rows[cabX + cabW - 2][0] - 1, 2, 1);
+  g.fillRect(cabX + cabW - 2, rows[cabX + cabW - 2][1], 2, 1);
+
+  // Heckfluegel
+  if (spec.spoiler) {
+    const [sy0, sy1] = rows[2];
+    g.fillStyle = dark;
+    g.fillRect(1, Math.max(0, sy0 - 1), 2, 1);
+    g.fillRect(1, Math.min(W - 1, sy1), 2, 1);
+    g.fillStyle = mid;
+    g.fillRect(1, sy0, 2, Math.max(1, sy1 - sy0));
+  }
+
+  // Scheinwerfer und Rueckleuchten - bei schmaler Front nur eine Einheit,
+  // sonst wuerden beide zu einem Klotz verschmelzen
+  const [fy0, fy1] = rows[L - 2];
+  g.fillStyle = '#fff4cf';
+  if (fy1 - fy0 >= 7) { g.fillRect(L - 2, fy0 + 1, 2, 2); g.fillRect(L - 2, fy1 - 3, 2, 2); }
+  else g.fillRect(L - 2, Math.round((fy0 + fy1) / 2) - 1, 2, 2);
+  const [by0, by1] = rows[1];
+  g.fillStyle = '#b02a26';
+  if (by1 - by0 >= 7) { g.fillRect(0, by0 + 1, 2, 2); g.fillRect(0, by1 - 3, 2, 2); }
+  else g.fillRect(0, Math.round((by0 + by1) / 2) - 1, 2, 2);
+
+  return c;
+}
+
+// Standbild mit Raedern - fuer Garage und Streckenauswahl
+export function makeCarPreview(spec) {
+  const body = makeCarSprite(spec);
+  const L = spec.len, W = spec.wid;
+  const c = document.createElement('canvas');
+  c.width = L; c.height = W + 4;
+  const g = c.getContext('2d');
+  const fx = Math.round(L * 0.30 + L / 2), rx = Math.round(-L * 0.32 + L / 2);
+  const ww = spec.wheel, wh = 3;
+  for (const cx of [fx, rx]) {
+    for (const cy of [1, W + 1]) {
+      g.fillStyle = '#0c0c10';
+      g.fillRect(cx - ww / 2, cy, ww, wh);
+      g.fillStyle = '#3a3a46';
+      g.fillRect(cx - ww / 2 + 1, cy + 1, ww - 2, 1);
+    }
+  }
+  g.drawImage(body, 0, 2);
+  return c;
+}
+
+// schwarze Silhouette fuer den Schlagschatten
+function makeShadowSprite(spec) {
+  const L = spec.len, W = spec.wid;
+  const c = document.createElement('canvas');
+  c.width = L + 2; c.height = W + 2;
+  const g = c.getContext('2d');
+  const rows = bodyMask(spec);
+  g.fillStyle = '#000';
+  for (let x = 0; x < L; x++) {
+    const [y0, y1] = rows[x];
+    g.fillRect(x + 1, y0, 1, y1 - y0);
+  }
   return c;
 }
 
