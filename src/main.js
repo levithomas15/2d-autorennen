@@ -1,9 +1,13 @@
-// PIXEL DRIFT CITY - Top-Down Drift-Simulator im GTA2-Look.
+// PIXEL DRIFT CITY - Top-Down-Drift-Simulator im GTA2-Look.
 import { World, TILE, MAP_W, MAP_H, WORLD_W, WORLD_H, T } from './world.js';
-import { Car, CAR_TYPES, PX_PER_M } from './car.js';
+import { Car, PX_PER_M } from './car.js';
+import { CARS, carById, buildSpec } from './cars.js';
+import { loadGarage, saveGarage, addCash } from './garage.js';
+import * as Settings from './settings.js';
 import { Input } from './input.js';
 import { Sfx } from './audio.js';
-import { drawText, drawTextShadow, textWidth } from './font.js';
+import { Menu } from './ui.js';
+import { drawTextShadow, textWidth } from './font.js';
 
 const VIEW_W = 480, VIEW_H = 270;
 
@@ -11,12 +15,14 @@ const screen = document.getElementById('screen');
 const ctx = screen.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
+const settings = Settings.load();
+const garage = loadGarage();
 const world = new World(20260915);
-const input = new Input();
-const sfx = new Sfx();
+const input = new Input(settings);
+const sfx = new Sfx(settings);
 
 const spawn = { x: world.arena.x, y: world.arena.y + world.arena.r * 0.55, h: -Math.PI / 2 };
-const car = new Car(spawn.x, spawn.y, 0);
+const car = new Car(spawn.x, spawn.y, currentSpec());
 car.reset(spawn.x, spawn.y, spawn.h);
 
 const cam = { x: car.x, y: car.y, shake: 0 };
@@ -24,79 +30,92 @@ const particles = [];
 const popups = [];
 
 const state = {
-  score: 0,
-  pending: 0,
-  multiplier: 1,
-  driftTime: 0,
-  grace: 0,
-  drifting: false,
+  score: 0, pending: 0, multiplier: 1,
+  driftTime: 0, grace: 0, drifting: false,
   best: Number(localStorage.getItem('pdc_best') || 0),
-  topSpeed: 0,
-  cones: 0,
-  flash: 0,
-  message: '',
-  messageTime: 0,
-  running: false,
+  cones: 0, flash: 0, running: false,
+  message: '', messageTime: 0,
 };
 
+function currentSpec() {
+  const c = carById(garage.selected);
+  return buildSpec(c, garage.cars[c.id], settings);
+}
+
+function refitCar() {
+  car.applySpec(currentSpec());
+}
+
+// ------------------------------------------------------------------- Menue
+const menu = new Menu({
+  settings, garage,
+  onChange: (key) => {
+    if (key === 'driftIntensity' || key === 'gripGlobal') refitCar();
+    if (key === 'shifterMode' || key === 'clutch' || key === 'showWheel' || key === 'showPedals') {
+      input.syncVisibility();
+      car.drivetrain.reset();
+    }
+    sfx.applySettings();
+  },
+  onCarChange: () => { refitCar(); },
+  onPlay: () => {
+    state.running = true;
+    document.getElementById('controls').classList.add('on');
+    input.syncVisibility();
+    sfx.start();
+  },
+});
+menu.open('start');
+
 // ------------------------------------------------------------------ Minimap
-const miniScale = 1;
 const mini = document.createElement('canvas');
-mini.width = MAP_W * miniScale; mini.height = MAP_H * miniScale;
+mini.width = MAP_W; mini.height = MAP_H;
 {
   const g = mini.getContext('2d');
   for (let ty = 0; ty < MAP_H; ty++) {
     for (let tx = 0; tx < MAP_W; tx++) {
       const t = world.get(tx, ty);
       g.fillStyle =
-        t === T.BUILDING ? '#2a2a34' :
-        t === T.GRASS ? '#2f5136' :
-        t === T.ARENA ? '#5a5a6e' :
-        t === T.LOT ? '#3f3f4c' :
+        t === T.BUILDING ? '#2a2a34' : t === T.GRASS ? '#2f5136' :
+        t === T.ARENA ? '#5a5a6e' : t === T.LOT ? '#3f3f4c' :
         t === T.SIDEWALK ? '#43434f' : '#6a6a80';
-      g.fillRect(tx * miniScale, ty * miniScale, miniScale, miniScale);
+      g.fillRect(tx, ty, 1, 1);
     }
   }
 }
 
-// ------------------------------------------------------------------ Skalierung
+// ---------------------------------------------------------------- Skalierung
 function resize() {
-  const pad = 0;
-  const sx = (innerWidth - pad) / VIEW_W, sy = (innerHeight - pad) / VIEW_H;
-  const s = Math.max(1, Math.floor(Math.min(sx, sy) * 2) / 2);   // halbe Stufen erlaubt
+  const s = Math.max(1, Math.floor(Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H) * 2) / 2);
   screen.style.width = VIEW_W * s + 'px';
   screen.style.height = VIEW_H * s + 'px';
 }
 addEventListener('resize', resize);
 resize();
 
-// ------------------------------------------------------------------ Start/Keys
-const overlay = document.getElementById('overlay');
-const controls = document.getElementById('controls');
-
-function startGame() {
-  overlay.classList.add('hidden');
-  controls.classList.add('on');
-  state.running = true;
-  sfx.start();
-  say('LOS GEHTS!');
-}
-document.getElementById('startBtn').addEventListener('click', startGame);
-
+// --------------------------------------------------------------- Tasteneingabe
 input.onKey = (code) => {
-  if (!state.running) {
-    if (code === 'Enter' || code === 'Space') startGame();
+  if (code === 'Escape' || code === 'KeyP') {
+    if (menu.isOpen) menu.close(); else menu.open();
     return;
   }
+  if (menu.isOpen || !state.running) return;
   if (code === 'KeyR') resetCar();
-  if (code === 'KeyC') {
-    car.setType(car.typeIndex + 1);
-    say(car.spec.name);
-    sfx.blip(880);
-  }
+  if (code === 'KeyC') cycleCar();
   if (code === 'KeyM') say(sfx.toggle() ? 'SOUND AN' : 'SOUND AUS');
   if (code === 'KeyK') { world.clearSkids(); say('SPUREN GELOESCHT'); }
 };
+
+function cycleCar() {
+  const owned = CARS.filter((c) => garage.owned[c.id]);
+  if (owned.length < 2) { say('NUR EIN AUTO - GARAGE BESUCHEN'); return; }
+  const i = owned.findIndex((c) => c.id === garage.selected);
+  garage.selected = owned[(i + 1) % owned.length].id;
+  saveGarage(garage);
+  refitCar();
+  say(car.spec.name);
+  sfx.blip(880);
+}
 
 function resetCar() {
   car.reset(spawn.x, spawn.y, spawn.h);
@@ -105,13 +124,30 @@ function resetCar() {
   say('RESET');
 }
 
+// naechstgelegene befahrbare Kachel suchen (Auto-Reset beim Festfahren)
+function freeSpotNear(x, y) {
+  const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
+  for (let r = 1; r < 14; r++) {
+    for (let j = -r; j <= r; j++) {
+      for (let i = -r; i <= r; i++) {
+        if (Math.max(Math.abs(i), Math.abs(j)) !== r) continue;
+        if (world.isRoadTile(tx + i, ty + j)) {
+          return { x: (tx + i) * TILE + TILE / 2, y: (ty + j) * TILE + TILE / 2 };
+        }
+      }
+    }
+  }
+  return { x: spawn.x, y: spawn.y };
+}
+
 function say(msg) { state.message = msg; state.messageTime = 1.8; }
 
-// ------------------------------------------------------------------ Drift-Logik
+// ------------------------------------------------------------------ Wertung
 function bankCombo() {
   if (state.pending > 0) {
     const total = Math.round(state.pending * state.multiplier);
     state.score += total;
+    addCash(garage, total);
     popups.push({ x: car.x, y: car.y - 14, life: 1.5, text: '+' + total, color: '#ffd96b' });
     if (state.score > state.best) {
       state.best = state.score;
@@ -131,14 +167,12 @@ function loseCombo() {
 
 function updateDrift(dt) {
   const slip = Math.abs(car.slip);
-  const speed = car.speed;
-  const isDrift = slip > 0.19 && speed > 5.5;
-
+  const isDrift = slip > 0.19 && car.speed > 5.5;
   if (isDrift) {
     state.drifting = true;
     state.grace = 0.9;
     state.driftTime += dt;
-    state.pending += speed * slip * 26 * dt;
+    state.pending += car.speed * slip * 26 * dt;
     state.multiplier = Math.min(10, 1 + Math.floor(state.driftTime / 1.6));
   } else if (state.grace > 0) {
     state.grace -= dt;
@@ -149,27 +183,27 @@ function updateDrift(dt) {
   }
 }
 
-// ------------------------------------------------------------------ Partikel
+// ----------------------------------------------------------------- Partikel
 function addSmoke(x, y, color, power) {
-  if (particles.length > 420) return;
-  particles.push({
+  if (particles.length > 420 || settings.particles <= 0) return;
+  const p = {
     x, y,
     vx: (Math.random() - 0.5) * 12 - car.vxWorld * 1.2,
     vy: (Math.random() - 0.5) * 12 - car.vyWorld * 1.2,
     r: 1.5 + Math.random() * 2, grow: 7 + power * 8,
-    life: 0.5 + Math.random() * 0.5 + power * 0.4, max: 1,
-    color, air: true,
-  });
-  particles[particles.length - 1].max = particles[particles.length - 1].life;
+    life: 0.5 + Math.random() * 0.5 + power * 0.4, max: 1, color, air: true,
+  };
+  p.max = p.life;
+  particles.push(p);
 }
 
 function addSpark(x, y, n, color) {
+  n = Math.round(n * settings.particles);
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2, s = 20 + Math.random() * 90;
     particles.push({
       x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
-      r: 1, grow: 0, life: 0.25 + Math.random() * 0.35, max: 0.6,
-      color, air: false,
+      r: 1, grow: 0, life: 0.25 + Math.random() * 0.35, max: 0.6, color, air: false,
     });
   }
 }
@@ -190,32 +224,32 @@ function updateParticles(dt) {
   }
 }
 
-// ------------------------------------------------------------------ Skidmarks
+// ---------------------------------------------------------------- Skidmarks
 let skidPrev = null;
-function paintSkids(dt) {
+function paintSkids() {
   const wheels = car.wheelPositions();
   const slip = Math.abs(car.slip);
   const hb = input.handbrake;
-  const intensity = Math.min(1, slip / 0.65) * Math.min(1, car.speed / 8) + (hb && car.speed > 2 ? 0.55 : 0) + car.wheelSpin * 0.7;
+  const intensity = Math.min(1, slip / 0.65) * Math.min(1, car.speed / 8)
+    + (hb && car.speed > 2 ? 0.55 : 0) + car.wheelSpin * 0.7;
   const surf = world.surfaceAt(car.x, car.y);
 
   if (intensity > 0.14) {
-    const g = world.skid.ctx;
-    g.lineCap = 'round';
-    g.lineWidth = 2.5;
-    g.strokeStyle = `rgba(14,12,16,${Math.min(0.7, 0.26 + intensity * 0.4)})`;
-    for (let i = 0; i < wheels.length; i++) {
-      const w = wheels[i];
-      if (!w.rear && intensity < 0.55) continue;         // vorne erst bei starkem Drift
-      if (skidPrev && skidPrev[i]) {
-        const p = skidPrev[i];
-        if (Math.hypot(w.x - p.x, w.y - p.y) < 30) {
+    if (settings.skidmarks) {
+      const g = world.skid.ctx;
+      g.lineCap = 'round';
+      g.lineWidth = 2.5;
+      g.strokeStyle = `rgba(14,12,16,${Math.min(0.7, 0.26 + intensity * 0.4)})`;
+      for (let i = 0; i < wheels.length; i++) {
+        const w = wheels[i];
+        if (!w.rear && intensity < 0.55) continue;
+        const p = skidPrev && skidPrev[i];
+        if (p && Math.hypot(w.x - p.x, w.y - p.y) < 30) {
           g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(w.x, w.y); g.stroke();
         }
       }
     }
-    // Rauch an den durchdrehenden Raedern
-    if (Math.random() < Math.min(1, intensity * 1.6)) {
+    if (Math.random() < Math.min(1, intensity * 1.6) * settings.particles) {
       const w = wheels[2 + (Math.random() < 0.5 ? 0 : 1)];
       addSmoke(w.x, w.y, surf.dust, intensity);
     }
@@ -223,7 +257,7 @@ function paintSkids(dt) {
   skidPrev = wheels;
 }
 
-// ------------------------------------------------------------------ Props
+// -------------------------------------------------------------------- Props
 function updateProps(dt) {
   for (const p of world.props) {
     if (p.hit > 0) {
@@ -246,30 +280,41 @@ function updateProps(dt) {
     popups.push({ x: p.x, y: p.y, life: 1.0, text: '+' + pts, color: '#8ee6c8' });
     addSpark(p.x, p.y, 6, p.type === 'cone' ? '#ff8a3c' : '#c9c9d6');
     sfx.blip(300, 0.06);
-    if (car.speed > 3) { car.vLong *= 0.985; }
   }
 }
 
-// ------------------------------------------------------------------ Update
+// ------------------------------------------------------------------- Update
 let last = performance.now();
 let skidFadeAcc = 0;
 
 function frame(now) {
-  let dt = (now - last) / 1000;
+  let dt = Math.min((now - last) / 1000, 1 / 30);
   last = now;
-  dt = Math.min(dt, 1 / 30);
 
-  input.update(dt);
+  const active = state.running && !menu.isOpen;
+  input.update(active ? dt : 0);
 
-  if (state.running) {
-    // Physik in festen Teilschritten -> stabiles Driftverhalten
+  if (active) {
+    const mode = Settings.shifterModeName(settings.shifterMode);
+    const ctl = {
+      throttle: input.throttle, brake: input.brake, steer: input.steer,
+      handbrake: input.handbrake,
+      clutch: settings.shifterMode === 2 && settings.clutch ? input.clutch : 0,
+      mode,
+    };
+
+    const shift = input.takeShift();
+    if (shift && mode === 'man') {
+      if (shift > 0) car.drivetrain.shiftUp(); else car.drivetrain.shiftDown();
+      sfx.blip(shift > 0 ? 440 : 330, 0.05);
+    }
+
     const steps = 3, sdt = dt / steps;
     let impact = 0;
-    for (let i = 0; i < steps; i++) {
-      impact = Math.max(impact, car.update(sdt, input, world));
-    }
+    for (let i = 0; i < steps; i++) impact = Math.max(impact, car.update(sdt, ctl, world, settings));
+
     if (impact > 0) {
-      cam.shake = Math.min(7, impact * 0.9);
+      cam.shake = Math.min(7, impact * 0.9) * settings.shake;
       sfx.crash(impact);
       addSpark(car.x + Math.cos(car.heading) * 12, car.y + Math.sin(car.heading) * 12, 10, '#ffd96b');
       if (impact > 3) loseCombo();
@@ -277,23 +322,29 @@ function frame(now) {
     }
 
     updateDrift(dt);
-    paintSkids(dt);
+    paintSkids();
     updateProps(dt);
-    state.topSpeed = Math.max(state.topSpeed, car.kmh);
+    input.setGearLabel(car.tele.gearLabel);
+
+    if (settings.autoReset && car.stuckTime > 2.5) {
+      const spot = freeSpotNear(car.x, car.y);
+      car.reset(spot.x, spot.y, car.heading);
+      say('FREIGESETZT');
+    }
 
     skidFadeAcc += dt;
-    if (skidFadeAcc > 1.2) { world.fadeSkids(); skidFadeAcc = 0; }
+    if (settings.skidFade && skidFadeAcc > 1.2) { world.fadeSkids(); skidFadeAcc = 0; }
 
-    const rpm = Math.min(1, car.kmh / 150) * 0.75 + car.wheelSpin * 0.25 + (input.throttle ? 0.12 : 0);
-    const squeal = Math.min(1, Math.max(0, (Math.abs(car.slip) - 0.14) * 2.2) * Math.min(1, car.speed / 7) + car.wheelSpin * 0.6);
-    sfx.update(Math.min(1, rpm), input.throttle, squeal);
+    const squeal = Math.min(1, Math.max(0, (Math.abs(car.slip) - 0.14) * 2.2)
+      * Math.min(1, car.speed / 7) + car.wheelSpin * 0.6);
+    sfx.update(car.rpmFrac, input.throttle, squeal, car.tele.limiter);
+  } else {
+    sfx.update(0, 0, 0, false);
   }
 
-  updateParticles(dt);
+  updateParticles(active ? dt : 0);
 
-  // Kamera mit Vorausschau in Fahrtrichtung
-  const lookX = car.x + car.vxWorld * 3.2;
-  const lookY = car.y + car.vyWorld * 3.2;
+  const lookX = car.x + car.vxWorld * 3.2, lookY = car.y + car.vyWorld * 3.2;
   const k = 1 - Math.pow(0.0015, dt);
   cam.x += (lookX - cam.x) * k;
   cam.y += (lookY - cam.y) * k;
@@ -306,30 +357,32 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// ------------------------------------------------------------------ Rendering
+// ---------------------------------------------------------------- Rendering
 function render() {
+  const z = settings.zoom;
+  const vw = VIEW_W / z, vh = VIEW_H / z;
   const shx = cam.shake ? (Math.random() - 0.5) * cam.shake : 0;
   const shy = cam.shake ? (Math.random() - 0.5) * cam.shake : 0;
-  let ox = Math.round(clamp(cam.x - VIEW_W / 2 + shx, 0, WORLD_W - VIEW_W));
-  let oy = Math.round(clamp(cam.y - VIEW_H / 2 + shy, 0, WORLD_H - VIEW_H));
+  const ox = clamp(cam.x - vw / 2 + shx, 0, WORLD_W - vw);
+  const oy = clamp(cam.y - vh / 2 + shy, 0, WORLD_H - vh);
 
   ctx.clearRect(0, 0, VIEW_W, VIEW_H);
-  ctx.drawImage(world.canvas, ox, oy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
-  ctx.drawImage(world.skid.canvas, ox, oy, VIEW_W, VIEW_H, 0, 0, VIEW_W, VIEW_H);
+  ctx.drawImage(world.canvas, ox, oy, vw, vh, 0, 0, VIEW_W, VIEW_H);
+  ctx.drawImage(world.skid.canvas, ox, oy, vw, vh, 0, 0, VIEW_W, VIEW_H);
 
   ctx.save();
+  ctx.scale(z, z);
   ctx.translate(-ox, -oy);
 
-  // Props
   for (const p of world.props) {
-    if (p.x < ox - 8 || p.y < oy - 8 || p.x > ox + VIEW_W + 8 || p.y > oy + VIEW_H + 8) continue;
+    if (p.x < ox - 8 || p.y < oy - 8 || p.x > ox + vw + 8 || p.y > oy + vh + 8) continue;
     drawProp(ctx, p);
   }
-
-  // Boden-Partikel (Funken)
   for (const p of particles) if (!p.air) drawParticle(ctx, p);
 
-  // Fahrzeugschatten + Fahrzeug
+  if (settings.underglow && car.spec.glow) drawUnderglow(ctx);
+  if (settings.headlights) drawHeadlights(ctx);
+
   ctx.save();
   ctx.globalAlpha = 0.32; ctx.fillStyle = '#000';
   ctx.translate(car.x + 2, car.y + 3); ctx.rotate(car.heading);
@@ -337,31 +390,66 @@ function render() {
   ctx.restore();
   car.draw(ctx);
 
-  // Rauch ueber dem Auto
   for (const p of particles) if (p.air) drawParticle(ctx, p);
 
-  // Punkte-Popups
   for (const p of popups) {
-    const a = Math.min(1, p.life / 0.4);
-    ctx.globalAlpha = a;
+    ctx.globalAlpha = Math.min(1, p.life / 0.4);
     drawTextShadow(ctx, p.text, p.x - textWidth(p.text, 1) / 2, p.y, 1, p.color);
     ctx.globalAlpha = 1;
   }
-
   ctx.restore();
 
-  // Vignette fuer den Konsolen-Look
-  const grd = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35, VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.85);
-  grd.addColorStop(0, 'rgba(0,0,0,0)');
-  grd.addColorStop(1, 'rgba(0,0,0,.45)');
-  ctx.fillStyle = grd; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-
+  if (settings.vignette) {
+    const grd = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.35,
+                                         VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.85);
+    grd.addColorStop(0, 'rgba(0,0,0,0)');
+    grd.addColorStop(1, 'rgba(0,0,0,.45)');
+    ctx.fillStyle = grd; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
   if (state.flash > 0) {
     ctx.fillStyle = `rgba(255,220,160,${state.flash * 1.6})`;
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
+  if (settings.scanlines) {
+    ctx.fillStyle = 'rgba(0,0,0,.16)';
+    for (let y = 0; y < VIEW_H; y += 2) ctx.fillRect(0, y, VIEW_W, 1);
+  }
 
   drawHud();
+}
+
+function drawUnderglow(g) {
+  const s = car.spec;
+  const pulse = settings.glowPulse ? 0.78 + 0.22 * Math.sin(performance.now() / 260) : 1;
+  const r = s.len * 0.95;
+  const grd = g.createRadialGradient(car.x, car.y, 2, car.x, car.y, r);
+  grd.addColorStop(0, hexA(s.glowColor, 0.55 * pulse));
+  grd.addColorStop(0.45, hexA(s.glowColor, 0.26 * pulse));
+  grd.addColorStop(1, hexA(s.glowColor, 0));
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  g.fillStyle = grd;
+  g.fillRect(car.x - r, car.y - r, r * 2, r * 2);
+  g.restore();
+}
+
+function drawHeadlights(g) {
+  const cs = Math.cos(car.heading), sn = Math.sin(car.heading);
+  const bx = car.x + cs * (car.spec.len * 0.5), by = car.y + sn * (car.spec.len * 0.5);
+  const len = 56, spread = 0.36;
+  const grd = g.createRadialGradient(bx, by, 2, bx, by, len);
+  grd.addColorStop(0, 'rgba(255,238,180,.16)');
+  grd.addColorStop(0.55, 'rgba(255,232,165,.07)');
+  grd.addColorStop(1, 'rgba(255,230,160,0)');
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  g.fillStyle = grd;
+  g.beginPath();
+  g.moveTo(bx, by);
+  g.lineTo(bx + Math.cos(car.heading - spread) * len, by + Math.sin(car.heading - spread) * len);
+  g.lineTo(bx + Math.cos(car.heading + spread) * len, by + Math.sin(car.heading + spread) * len);
+  g.closePath(); g.fill();
+  g.restore();
 }
 
 function drawParticle(g, p) {
@@ -389,77 +477,103 @@ function drawProp(g, p) {
   }
 }
 
+// -------------------------------------------------------------------- HUD
 function drawHud() {
-  // --- Tacho mittig unten (links/rechts bleiben fuer Lenkrad und Pedale frei)
-  const kmh = Math.round(car.kmh);
-  const kmhTxt = String(kmh);
-  const kmhW = textWidth(kmhTxt, 3), unitW = textWidth('KM/H', 1);
   const cxHud = VIEW_W / 2;
+  const withGears = settings.shifterMode !== 0;
+
+  // Tacho mittig unten
+  const kmhTxt = String(Math.round(car.kmh));
+  const kmhW = textWidth(kmhTxt, 3), unitW = textWidth('KM/H', 1);
   const grpX = cxHud - (kmhW + 4 + unitW) / 2;
   drawTextShadow(ctx, kmhTxt, grpX, VIEW_H - 24, 3, '#ffd96b');
   drawTextShadow(ctx, 'KM/H', grpX + kmhW + 4, VIEW_H - 14, 1, '#b9b9cf');
 
-  // Drehzahlbalken
-  const barW = 74, barX = cxHud - barW / 2, barY = VIEW_H - 32;
-  ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(barX - 1, barY - 1, barW + 2, 5);
-  const fill = Math.min(1, car.kmh / 160);
+  // Drehzahlband (mit Getriebe: echte Drehzahl, sonst Tempo)
+  const barW = 90, barX = cxHud - barW / 2, barY = VIEW_H - 34;
+  const fill = withGears ? Math.min(1, car.rpmFrac) : Math.min(1, car.kmh / 190);
+  ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(barX - 1, barY - 1, barW + 2, 6);
   for (let i = 0; i < barW; i += 3) {
-    if (i / barW > fill) break;
-    ctx.fillStyle = i / barW > 0.82 ? '#ff5a3c' : i / barW > 0.6 ? '#ffd96b' : '#8ee6c8';
-    ctx.fillRect(barX + i, barY, 2, 3);
+    const f = i / barW;
+    if (f > fill) break;
+    ctx.fillStyle = f > 0.88 ? '#ff5a3c' : f > 0.65 ? '#ffd96b' : '#8ee6c8';
+    ctx.fillRect(barX + i, barY, 2, 4);
+  }
+  if (car.tele.limiter) {
+    drawTextShadow(ctx, 'LIMIT', barX + barW + 5, barY - 1, 1, '#ff5a3c');
   }
 
-  // --- Score oben links
+  if (withGears) {
+    // Gang links neben dem Tacho
+    const gl = car.tele.gearLabel;
+    drawTextShadow(ctx, gl, barX - textWidth(gl, 3) - 10, VIEW_H - 26, 3,
+      car.tele.shifting ? '#8b8ba6' : '#f2f2f6');
+    drawTextShadow(ctx, 'GANG', barX - textWidth('GANG', 1) - 10, VIEW_H - 9, 1, '#8b8ba6');
+
+    // Ladedruck
+    if (car.spec.turboLevel > 0) {
+      const bw = 40, bx = barX + barW + 8, by = VIEW_H - 24;
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(bx - 1, by - 1, bw + 2, 5);
+      ctx.fillStyle = '#4ad6ff';
+      ctx.fillRect(bx, by, Math.round(bw * Math.min(1, car.tele.boost)), 3);
+      drawTextShadow(ctx, 'TURBO', bx, by + 6, 1, '#8b8ba6');
+    }
+  }
+
+  // Score / Geld
   drawTextShadow(ctx, 'SCORE ' + state.score, 8, 8, 2, '#f2f2f6');
   drawTextShadow(ctx, 'BEST ' + state.best, 8, 22, 1, '#8ee6c8');
-  drawTextShadow(ctx, car.spec.name + ' [C]', 8, 31, 1, '#b9b9cf');
+  drawTextShadow(ctx, 'CASH ' + garage.cash, 8, 31, 1, '#ffd96b');
+  drawTextShadow(ctx, car.spec.name, 8, 40, 1, '#b9b9cf');
 
-  // --- Drift-Combo mittig oben
+  // Drift-Combo
   if (state.pending > 0) {
     const txt = Math.round(state.pending) + ' X' + state.multiplier;
     const scale = state.drifting ? 2 : 1;
     const w = textWidth(txt, scale);
-    const alpha = state.drifting ? 1 : Math.max(0.25, state.grace / 0.9);
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = state.drifting ? 1 : Math.max(0.25, state.grace / 0.9);
     const col = state.multiplier >= 6 ? '#ff5a3c' : state.multiplier >= 3 ? '#ffd96b' : '#8ee6c8';
     drawTextShadow(ctx, txt, (VIEW_W - w) / 2, 12, scale, col);
     if (state.drifting) {
       drawTextShadow(ctx, 'DRIFT', (VIEW_W - textWidth('DRIFT', 1)) / 2, 30, 1, col);
-      // Combo-Timer-Balken
       const cw = 90, cx = (VIEW_W - cw) / 2;
-      const frac = (state.driftTime % 1.6) / 1.6;
       ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(cx, 40, cw, 3);
-      ctx.fillStyle = col; ctx.fillRect(cx, 40, cw * frac, 3);
+      ctx.fillStyle = col; ctx.fillRect(cx, 40, cw * ((state.driftTime % 1.6) / 1.6), 3);
     }
     ctx.globalAlpha = 1;
   }
 
-  // --- Minimap oben rechts
-  const mw = 72, mx = VIEW_W - mw - 8, my = 8;
-  ctx.fillStyle = 'rgba(8,8,14,.75)';
-  ctx.fillRect(mx - 2, my - 2, mw + 4, mw + 4);
-  ctx.drawImage(mini, 0, 0, mini.width, mini.height, mx, my, mw, mw);
-  const px = mx + (car.x / WORLD_W) * mw, py = my + (car.y / WORLD_H) * mw;
-  ctx.fillStyle = '#ffd96b'; ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 3, 3);
-  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1;
-  ctx.strokeRect(mx - 1.5, my - 1.5, mw + 3, mw + 3);
-  drawTextShadow(ctx, 'KEGEL ' + state.cones, mx, my + mw + 5, 1, '#b9b9cf');
+  // Minimap
+  if (settings.minimap) {
+    const mw = 72, mx = VIEW_W - mw - 8, my = 8;
+    ctx.fillStyle = 'rgba(8,8,14,.75)';
+    ctx.fillRect(mx - 2, my - 2, mw + 4, mw + 4);
+    ctx.drawImage(mini, 0, 0, mini.width, mini.height, mx, my, mw, mw);
+    ctx.fillStyle = '#ffd96b';
+    ctx.fillRect(Math.round(mx + (car.x / WORLD_W) * mw) - 1,
+                 Math.round(my + (car.y / WORLD_H) * mw) - 1, 3, 3);
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1;
+    ctx.strokeRect(mx - 1.5, my - 1.5, mw + 3, mw + 3);
+    drawTextShadow(ctx, 'KEGEL ' + state.cones, mx, my + mw + 5, 1, '#b9b9cf');
+  }
 
-  // --- Handbremse / Meldung
   if (input.handbrake) {
-    drawTextShadow(ctx, 'HANDBREMSE', (VIEW_W - textWidth('HANDBREMSE', 1)) / 2, VIEW_H - 42, 1, '#ff5a3c');
+    drawTextShadow(ctx, 'HANDBREMSE', (VIEW_W - textWidth('HANDBREMSE', 1)) / 2, VIEW_H - 44, 1, '#ff5a3c');
   }
   if (state.messageTime > 0) {
     ctx.globalAlpha = Math.min(1, state.messageTime / 0.5);
-    const w = textWidth(state.message, 2);
-    drawTextShadow(ctx, state.message, (VIEW_W - w) / 2, VIEW_H - 54, 2, '#f2f2f6');
+    drawTextShadow(ctx, state.message, (VIEW_W - textWidth(state.message, 2)) / 2, VIEW_H - 62, 2, '#f2f2f6');
     ctx.globalAlpha = 1;
   }
 }
 
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
 function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
 requestAnimationFrame(frame);
 
-// Debug-Zugriff aus der Konsole: __dbg.car, __dbg.state
-window.__dbg = { car, state, input, world };
+// Debug-Zugriff aus der Konsole: __dbg.car, __dbg.state, __dbg.settings
+window.__dbg = { car, state, input, world, settings, garage, menu };

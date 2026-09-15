@@ -13,8 +13,7 @@ html, body {
 #stage {
   position: fixed; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background:
-    radial-gradient(ellipse at 50% 40%, #1a1a2e 0%, #07070c 70%);
+  background: radial-gradient(ellipse at 50% 40%, #1a1a2e 0%, #07070c 70%);
 }
 
 #screen {
@@ -25,91 +24,211 @@ html, body {
   box-shadow: 0 0 0 2px #2c2c3c, 0 18px 60px rgba(0,0,0,.8);
 }
 
-/* ---------- Lenkrad + Pedale ---------- */
-#controls {
-  position: fixed; inset: 0;
-  pointer-events: none;
-  display: none;
-}
+/* ------------------------------------------------ Lenkrad, Pedale, Schaltung */
+#controls { position: fixed; inset: 0; pointer-events: none; display: none; }
 #controls.on { display: block; }
 
 #wheelBox {
-  position: absolute;
-  left: 18px; bottom: 18px;
+  position: absolute; left: 18px; bottom: 18px;
   width: 168px; height: 168px;
-  pointer-events: auto;
-  cursor: grab;
-  touch-action: none;
+  pointer-events: auto; cursor: grab; touch-action: none;
 }
 #wheelBox:active { cursor: grabbing; }
 #wheel { width: 100%; height: 100%; display: block; }
 
 #pedals {
-  position: absolute;
-  right: 18px; bottom: 18px;
-  display: flex; gap: 10px;
-  pointer-events: auto;
+  position: absolute; right: 18px; bottom: 18px;
+  display: flex; gap: 9px; pointer-events: auto;
 }
 .pedal {
   pointer-events: auto;
-  width: 78px; height: 78px;
+  width: 74px; height: 74px;
   border-radius: 12px;
   border: 2px solid #4a4a66;
   background: rgba(24,24,38,.72);
   color: #cfcfe4;
-  font: bold 12px "Courier New", monospace;
-  letter-spacing: 1px;
-  cursor: pointer;
-  touch-action: none;
+  font: bold 11px "Courier New", monospace;
+  letter-spacing: 1px; cursor: pointer; touch-action: none;
 }
 .pedal.down { background: #ff9d2e; color: #17111f; border-color: #ffd08a; }
-#pGas { width: 96px; }
+#pGas { width: 92px; }
 
-/* ---------- Titelscreen ---------- */
-#overlay {
-  position: fixed; inset: 0;
+#shifterWrap {
+  position: absolute; right: 18px; bottom: 104px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  pointer-events: auto;
+}
+#shifter {
+  width: 58px; height: 84px;
+  border-radius: 10px;
+  border: 2px solid #4a4a66;
+  background: rgba(20,20,32,.72);
   display: flex; align-items: center; justify-content: center;
-  background: rgba(6,6,12,.82);
-  backdrop-filter: blur(2px);
-  text-align: center;
-  z-index: 10;
+  cursor: grab; touch-action: none;
 }
-#overlay.hidden { display: none; }
+#shifter.grab { cursor: grabbing; border-color: #ffd96b; }
+#shiftKnob {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: #2f2f48; border: 2px solid #6d6d94;
+  display: flex; align-items: center; justify-content: center;
+  font: bold 18px "Courier New", monospace; color: #ffd96b;
+  transition: transform .12s ease-out;
+}
+.shiftBtn {
+  width: 58px; height: 26px; border-radius: 7px;
+  border: 2px solid #4a4a66; background: rgba(20,20,32,.72);
+  color: #cfcfe4; font: bold 14px "Courier New", monospace; cursor: pointer;
+}
+.shiftBtn:active { background: #ffd96b; color: #17111f; }
 
-#title h1 {
-  font-size: clamp(28px, 7vw, 62px);
-  letter-spacing: 4px;
-  color: #ffd96b;
-  text-shadow: 3px 3px 0 #b8331f, 6px 6px 0 rgba(0,0,0,.5);
+/* -------------------------------------------------------------------- Menue */
+#menu {
+  position: fixed; inset: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6,6,12,.88);
+  padding: 18px;
 }
-#title h1 span { color: #ff6b4a; }
-.sub {
-  margin-top: 6px; color: #8ee6c8; letter-spacing: 3px;
-  font-size: clamp(11px, 2.2vw, 15px);
-}
-.keys {
-  margin: 26px auto 0; line-height: 2;
-  font-size: clamp(11px, 2vw, 14px);
-  color: #b9b9cf;
-}
-.keys b {
-  display: inline-block; min-width: 20px;
-  padding: 1px 7px; margin: 0 2px;
-  background: #23233a; border: 1px solid #45456a; border-radius: 4px;
-  color: #ffd96b;
-}
-#startBtn {
-  margin-top: 28px; padding: 14px 44px;
-  font: bold 18px "Courier New", monospace; letter-spacing: 4px;
-  color: #17111f; background: #ffd96b;
-  border: none; border-radius: 6px; cursor: pointer;
-  box-shadow: 0 5px 0 #b8331f;
-}
-#startBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8331f; }
+#menu.hidden { display: none; }
 
-@media (max-width: 620px) {
-  #wheelBox { width: 124px; height: 124px; left: 10px; bottom: 10px; }
-  .pedal { width: 62px; height: 62px; }
-  #pGas { width: 74px; }
-  #pedals { right: 10px; bottom: 10px; gap: 7px; }
+.panel {
+  width: min(880px, 100%);
+  max-height: 100%;
+  display: flex; flex-direction: column;
+  background: #12121c;
+  border: 2px solid #33334d;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.panel header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  background: #171726; border-bottom: 2px solid #33334d;
+}
+.brand { font-size: 20px; letter-spacing: 3px; color: #ffd96b; }
+.brand span { color: #ff6b4a; }
+#menuCash { color: #8ee6c8; font-size: 16px; letter-spacing: 1px; }
+
+#menuTabs { display: flex; gap: 2px; padding: 8px 10px 0; flex-wrap: wrap; }
+.tab {
+  padding: 8px 16px; border: none; border-radius: 6px 6px 0 0;
+  background: #1b1b2b; color: #9a9ab8; cursor: pointer;
+  font: bold 12px "Courier New", monospace; letter-spacing: 2px;
+}
+.tab.active { background: #262640; color: #ffd96b; }
+
+#menuBody { padding: 16px; overflow-y: auto; }
+
+h2 { font-size: 26px; letter-spacing: 4px; color: #ffd96b; margin-bottom: 10px; }
+h3 { font-size: 13px; letter-spacing: 3px; color: #8ee6c8; margin-bottom: 8px; }
+.lead { color: #c3c3d8; line-height: 1.6; max-width: 60ch; font-size: 13px; }
+.small { color: #8b8ba6; font-size: 11px; line-height: 1.6; display: block; }
+
+.startBox { padding: 10px 0 4px; }
+button.big {
+  margin-top: 22px; padding: 14px 40px;
+  font: bold 16px "Courier New", monospace; letter-spacing: 4px;
+  color: #17111f; background: #ffd96b; border: none; border-radius: 6px;
+  cursor: pointer; box-shadow: 0 5px 0 #b8331f;
+}
+button.big:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8331f; }
+.hintRow { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 22px; }
+.hintRow span { font-size: 11px; color: #7e7e9c; letter-spacing: 1px; }
+
+/* ------------------------------------------------------------------ Garage */
+.carList { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.carCard {
+  flex: 1 1 120px; min-width: 120px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 6px;
+  background: #1b1b2b; border: 2px solid #2e2e46; border-radius: 8px;
+  color: #d5d5e6; cursor: pointer;
+  font: bold 12px "Courier New", monospace; letter-spacing: 1px;
+}
+.carCard.sel { border-color: #ffd96b; background: #262640; }
+.carCard.locked { opacity: .62; }
+.carCard .price { font-size: 10px; color: #8ee6c8; letter-spacing: 1px; }
+.carCard.locked .price { color: #ffb347; }
+canvas.thumb { image-rendering: pixelated; }
+
+.tunePanel { background: #17172a; border: 2px solid #2e2e46; border-radius: 8px; padding: 12px; }
+.tuneHead { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.tuneHead > div { flex: 1 1 260px; }
+.stats { margin-top: 8px; display: grid; gap: 4px; }
+.statRow { display: flex; align-items: center; gap: 8px; }
+.statName { width: 52px; font-size: 10px; color: #8b8ba6; letter-spacing: 1px; }
+.statTrack { flex: 1; height: 7px; background: #23233a; border-radius: 3px; overflow: hidden; }
+.statFill { height: 100%; background: linear-gradient(90deg, #8ee6c8, #ffd96b); }
+
+.tuneRow {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 9px 0; border-top: 1px solid #262640;
+}
+.tuneInfo { flex: 1 1 220px; }
+.tuneInfo b { font-size: 12px; letter-spacing: 2px; }
+.pips { display: flex; gap: 4px; }
+.pip { width: 16px; height: 9px; background: #262640; border-radius: 2px; display: block; }
+.pip.on { background: #ffd96b; }
+
+button.buy {
+  min-width: 96px; padding: 8px 12px;
+  background: #2b6d52; color: #eafff5; border: 2px solid #3f9873; border-radius: 6px;
+  font: bold 12px "Courier New", monospace; letter-spacing: 1px; cursor: pointer;
+}
+button.buy.poor { background: #3a2230; border-color: #6b3a4d; color: #c89aac; }
+button.buy:disabled { background: #23233a; border-color: #33334d; color: #6f6f8c; cursor: default; }
+button.buy.wide { width: 100%; margin-top: 16px; }
+
+.swatches { display: flex; gap: 5px; flex-wrap: wrap; }
+.swatch {
+  width: 24px; height: 24px; border-radius: 5px;
+  border: 2px solid #3a3a58; cursor: pointer;
+}
+.swatch.sel { border-color: #fff; transform: scale(1.12); }
+
+@keyframes nope { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.nope { animation: nope .22s; }
+
+/* ----------------------------------------------------------- Einstellungen */
+.settings { display: grid; gap: 18px; }
+.setGroup { background: #17172a; border: 2px solid #2e2e46; border-radius: 8px; padding: 12px; }
+.setRow {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 9px 0; border-top: 1px solid #262640;
+}
+.setGroup h3 + .setRow { border-top: none; }
+.setLabel { flex: 1 1 260px; }
+.setLabel b { font-size: 12px; letter-spacing: 2px; }
+
+button.switch {
+  width: 74px; padding: 8px 0;
+  background: #262640; color: #9a9ab8;
+  border: 2px solid #3a3a58; border-radius: 6px; cursor: pointer;
+  font: bold 12px "Courier New", monospace; letter-spacing: 2px;
+}
+button.switch.on { background: #2b6d52; border-color: #3f9873; color: #eafff5; }
+
+.choices { display: flex; gap: 4px; flex-wrap: wrap; }
+button.choice {
+  padding: 8px 12px; background: #262640; color: #9a9ab8;
+  border: 2px solid #3a3a58; border-radius: 6px; cursor: pointer;
+  font: bold 11px "Courier New", monospace; letter-spacing: 1px;
+}
+button.choice.on { background: #ffd96b; border-color: #ffd96b; color: #17111f; }
+
+.rangeBox { display: flex; align-items: center; gap: 10px; min-width: 210px; }
+.rangeBox input { width: 160px; accent-color: #ffd96b; }
+.rangeVal { width: 42px; text-align: right; color: #ffd96b; font-size: 12px; }
+
+.help .setGroup p { margin-bottom: 3px; }
+
+@media (max-width: 680px) {
+  #wheelBox { width: 118px; height: 118px; left: 10px; bottom: 10px; }
+  .pedal { width: 56px; height: 56px; font-size: 9px; }
+  #pGas { width: 66px; }
+  #pedals { right: 10px; bottom: 10px; gap: 6px; }
+  #shifterWrap { right: 10px; bottom: 76px; }
+  #shifter { width: 46px; height: 62px; }
+  .shiftBtn { width: 46px; }
+  .brand { font-size: 15px; }
+  #menuBody { padding: 12px; }
 }

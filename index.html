@@ -10,29 +10,37 @@
 <div id="stage">
   <canvas id="screen" width="480" height="270"></canvas>
 
-  <div id="overlay">
-    <div id="title">
-      <h1>PIXEL<span>DRIFT</span>CITY</h1>
-      <p class="sub">Top-Down Drift Simulator</p>
-      <div class="keys">
-        <div><b>W</b> / <b>&uarr;</b> Gas &nbsp;&nbsp; <b>S</b> / <b>&darr;</b> Bremse &amp; R&uuml;ckw&auml;rts</div>
-        <div><b>A</b> <b>D</b> / <b>&larr;</b> <b>&rarr;</b> Lenken &nbsp;&nbsp; <b>LEERTASTE</b> Handbremse</div>
-        <div><b>Lenkrad ziehen</b> (Maus / Touch) zum Lenken</div>
-        <div><b>R</b> Reset &nbsp;&nbsp; <b>C</b> Auto wechseln &nbsp;&nbsp; <b>M</b> Sound</div>
-      </div>
-      <button id="startBtn">START</button>
-    </div>
-  </div>
-
-  <!-- Lenkrad + Touch-Pedale -->
+  <!-- Bedienelemente: Lenkrad, Pedale, Schalthebel -->
   <div id="controls">
     <div id="wheelBox">
       <canvas id="wheel" width="220" height="220"></canvas>
     </div>
+
     <div id="pedals">
-      <button class="pedal" id="pBrake">BRAKE</button>
+      <button class="pedal" id="pClutch">KUPP</button>
+      <button class="pedal" id="pBrake">BREMSE</button>
       <button class="pedal" id="pHand">HAND</button>
       <button class="pedal" id="pGas">GAS</button>
+    </div>
+
+    <div id="shifterWrap">
+      <button class="shiftBtn" id="shiftUp">+</button>
+      <div id="shifter">
+        <div id="shiftKnob"><span id="gearReadout">1</span></div>
+      </div>
+      <button class="shiftBtn" id="shiftDown">&minus;</button>
+    </div>
+  </div>
+
+  <!-- Menue: Start / Garage / Einstellungen / Hilfe -->
+  <div id="menu">
+    <div class="panel">
+      <header>
+        <div class="brand">PIXEL<span>DRIFT</span>CITY</div>
+        <div id="menuCash">$ 0</div>
+      </header>
+      <nav id="menuTabs"></nav>
+      <div id="menuBody"></div>
     </div>
   </div>
 </div>

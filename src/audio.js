@@ -2,10 +2,17 @@
 // (gefiltertes Rauschen) und ein Crash-Noise-Burst. Kein Asset noetig.
 
 export class Sfx {
-  constructor() {
+  constructor(settings) {
+    this.settings = settings;
     this.ctx = null;
     this.enabled = true;
     this.started = false;
+  }
+
+  get masterVol() { return this.enabled ? this.settings.volMaster : 0; }
+
+  applySettings() {
+    if (this.master) this.master.gain.value = this.masterVol;
   }
 
   start() {
@@ -17,7 +24,7 @@ export class Sfx {
     this.started = true;
 
     this.master = ctx.createGain();
-    this.master.gain.value = 0.5;
+    this.master.gain.value = this.masterVol;
     this.master.connect(ctx.destination);
 
     // --- Motor
@@ -55,19 +62,22 @@ export class Sfx {
 
   toggle() {
     this.enabled = !this.enabled;
-    if (this.master) this.master.gain.value = this.enabled ? 0.5 : 0;
+    this.applySettings();
     return this.enabled;
   }
 
-  // rpm 0..1, load 0..1, squeal 0..1
-  update(rpm, load, squeal) {
+  // rpm 0..1 (Drehzahl), load 0..1 (Gas), squeal 0..1 (Reifen)
+  update(rpm, load, squeal, limiter) {
     if (!this.ctx || !this.enabled) return;
     const t = this.ctx.currentTime;
-    const base = 55 + rpm * 240;
-    this.osc1.frequency.setTargetAtTime(base, t, 0.05);
-    this.osc2.frequency.setTargetAtTime(base * 0.5, t, 0.05);
-    this.engGain.gain.setTargetAtTime(0.055 + load * 0.075, t, 0.08);
-    this.tireGain.gain.setTargetAtTime(squeal * 0.16, t, 0.05);
+    const st = this.settings;
+    // Am Begrenzer stottert die Zuendung hoerbar
+    const cut = limiter && ((t * 40) % 2 < 1) ? 0.35 : 1;
+    const base = 55 + rpm * 260;
+    this.osc1.frequency.setTargetAtTime(base, t, 0.04);
+    this.osc2.frequency.setTargetAtTime(base * 0.5, t, 0.04);
+    this.engGain.gain.setTargetAtTime((0.055 + load * 0.075) * st.volEngine * cut, t, 0.07);
+    this.tireGain.gain.setTargetAtTime(squeal * 0.16 * st.volTires, t, 0.05);
     this.tireFilter.frequency.setTargetAtTime(1200 + squeal * 1600, t, 0.08);
   }
 
