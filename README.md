@@ -1,7 +1,7 @@
 # PIXEL DRIFT CITY
 
 Ein Top-Down-Drift-Simulator im Stil von GTA 1/2 – Vogelperspektive, Pixel-Optik,
-prozedural erzeugte Stadt, Lenkrad, Pedale und optionale Gangschaltung.
+sechs prozedural erzeugte Strecken, Lenkrad, Pedale und optionale Gangschaltung.
 
 Reines HTML5 + Canvas + ES-Module. Keine Abhängigkeiten, kein Build-Schritt.
 
@@ -27,6 +27,7 @@ npx http-server -p 8080 .
 | `R` | Auto zurücksetzen |
 | `C` | Auto wechseln |
 | `M` | Sound an/aus |
+| `N` | Strecke wechseln |
 | `K` | Reifenspuren löschen |
 | `Esc` / `P` | Menü |
 
@@ -48,6 +49,24 @@ In den Einstellungen unter *Steuerung* in drei Stufen:
 Simuliert werden Drehmomentkurve, Drehzahlbegrenzer, Motorbremse,
 Turbo mit Ladedruckaufbau und die einzelnen Übersetzungen. Das HUD zeigt dann
 Gang, Drehzahlband und Ladedruck.
+
+## Strecken
+
+Sechs Karten, jederzeit im Menü unter *Strecken* oder mit `N` umschaltbar.
+Die Auswahl wird gespeichert.
+
+| Strecke | Größe | Charakter |
+| --- | --- | --- |
+| INNENSTADT | 104×104 | dichtes Straßenraster mit Drift-Arena in der Mitte |
+| HAFENVIERTEL | 120×104 | weite Kaiflächen, Lagerhallen, Wasser ringsum |
+| BERGPASS | 88×136 | enge Serpentinen mit Kehren und Gipfelplateau |
+| INDUSTRIEPARK | 112×112 | riesige Asphaltflächen, Hallen, Kreisverkehr, Teststrecke |
+| DRIFT-STADION | 88×88 | reine Spielwiese: Acht, Kreisel, Eisflächen |
+| WINTERSTADT | 96×96 | verschneite Stadt mit Eisplatten, wenig Grip |
+
+Der Untergrund zählt in der Physik mit – Asphalt und Beton greifen voll,
+Schotter und Schnee deutlich weniger, Sand bremst stark und Eis hat fast
+keinen Grip. Wasser, Fels, Gebäude und Banden sind fest.
 
 ## Garage
 
@@ -122,13 +141,16 @@ Stadt eignen sich für Donuts.
 | `src/garage.js` | Geld, Besitz und Tuning-Stand (localStorage) |
 | `src/settings.js` | Einstellungs-Schema, Standardwerte, Speicherung |
 | `src/ui.js` | Menü: Start, Garage, Einstellungen, Hilfe |
-| `src/world.js` | Stadtgenerator, Vorab-Rendering, Kollisionsgeometrie |
+| `src/world.js` | Kacheln, Bau-Werkzeuge, Vorab-Rendering, Kollisionsgeometrie |
+| `src/maps.js` | die sechs Karten und ihre Generatoren |
 | `src/input.js` | Tastatur, Lenkrad, Pedale, Schalthebel |
 | `src/audio.js` | Prozeduraler Motor-, Reifen- und Crash-Sound |
 | `src/font.js` | 3×5-Pixel-Font fürs HUD |
 
-Die Stadt wird aus einem festen Seed erzeugt und einmalig auf ein
+Jede Karte wird aus einem festen Seed erzeugt und einmalig auf ein
 Offscreen-Canvas gerendert; pro Frame wird nur der sichtbare Ausschnitt kopiert.
+Für die Vorschaubilder im Menü werden die Karten im Modus `tilesOnly` gebaut –
+also nur die Kacheldaten, ohne das teure Rendering.
 Reifenspuren liegen auf einer zweiten Ebene in Weltgröße und verblassen langsam.
 
 Interne Auflösung: 480 × 270, hochskaliert ohne Glättung – daher die harten Pixel.

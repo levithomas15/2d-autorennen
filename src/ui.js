@@ -7,6 +7,18 @@ import {
   carById, buildSpec, statBars, upgradeCost,
 } from './cars.js';
 import { buyCar, buyUpgrade, buyGlow, setPaint, saveGarage } from './garage.js';
+import { MAPS, mapById } from './maps.js';
+import { World, minimapCanvas } from './world.js';
+
+// Vorschaubilder werden einmal erzeugt und dann behalten (nur Kacheldaten,
+// kein vollstaendiges Rendering).
+const previewCache = new Map();
+function mapPreview(map) {
+  if (!previewCache.has(map.id)) {
+    previewCache.set(map.id, minimapCanvas(new World(map, { tilesOnly: true })));
+  }
+  return previewCache.get(map.id);
+}
 
 export class Menu {
   constructor(opts) {
@@ -14,6 +26,8 @@ export class Menu {
     this.garage = opts.garage;
     this.onChange = opts.onChange || (() => {});
     this.onCarChange = opts.onCarChange || (() => {});
+    this.onMapChange = opts.onMapChange || (() => {});
+    this.mapId = opts.mapId || (() => MAPS[0].id);
     this.onPlay = opts.onPlay || (() => {});
     this.tab = 'start';
     this.started = false;
@@ -47,6 +61,7 @@ export class Menu {
     this.cashEl.textContent = '$ ' + this.garage.cash.toLocaleString('de-DE');
     this.bodyEl.innerHTML = '';
     if (this.tab === 'start') this.renderStart();
+    else if (this.tab === 'maps') this.renderMaps();
     else if (this.tab === 'garage') this.renderGarage();
     else if (this.tab === 'settings') this.renderSettings();
     else this.renderHelp();
@@ -55,6 +70,7 @@ export class Menu {
   renderTabs() {
     const tabs = [
       ['start', this.started ? 'WEITER' : 'START'],
+      ['maps', 'STRECKEN'],
       ['garage', 'GARAGE'],
       ['settings', 'EINSTELLUNGEN'],
       ['help', 'HILFE'],
@@ -79,7 +95,8 @@ export class Menu {
       'bau dir in der Garage das Auto, das du willst.'));
 
     const car = carById(this.garage.selected);
-    box.appendChild(el('p', 'lead small', 'AKTUELLES AUTO: ' + car.name));
+    box.appendChild(el('p', 'lead small',
+      'AKTUELLES AUTO: ' + car.name + '   -   STRECKE: ' + mapById(this.mapId()).name));
 
     const play = el('button', 'big', this.started ? 'WEITERFAHREN' : 'LOSFAHREN');
     play.onclick = () => { this.started = true; this.onPlay(); this.close(); };
@@ -92,6 +109,32 @@ export class Menu {
     hint.appendChild(el('span', '', 'ESC MENUE'));
     box.appendChild(hint);
     this.bodyEl.appendChild(box);
+  }
+
+  // ---------------------------------------------------------------- Strecken
+  renderMaps() {
+    const wrap = el('div', 'mapList');
+    const current = this.mapId();
+    for (const m of MAPS) {
+      const card = el('button', 'mapCard' + (m.id === current ? ' sel' : ''));
+      const shot = el('div', 'mapShot');
+      const img = mapPreview(m);
+      img.className = 'thumb';
+      shot.appendChild(img);      // jede Karte hat ihr eigenes Vorschau-Canvas
+      card.appendChild(shot);
+      card.appendChild(el('b', '', m.name));
+      card.appendChild(el('span', 'small', m.desc));
+      card.appendChild(el('span', 'mapSize', m.w + ' X ' + m.h + ' KACHELN'));
+      card.onclick = () => {
+        if (m.id !== this.mapId()) this.onMapChange(m.id);
+        this.render();
+      };
+      wrap.appendChild(card);
+    }
+    const note = el('p', 'small');
+    note.textContent = 'TASTE N WECHSELT IM SPIEL DIE STRECKE.';
+    wrap.appendChild(note);
+    this.bodyEl.appendChild(wrap);
   }
 
   // ----------------------------------------------------------------- Garage
@@ -316,6 +359,11 @@ export class Menu {
       'AUTOMATIK = GAENGE WERDEN SIMULIERT UND SELBST GESCHALTET.',
       'MANUELL = DU SCHALTEST SELBST, OPTIONAL MIT KUPPLUNG.',
       'DER HEBEL RECHTS LAESST SICH AUCH MIT DER MAUS ZIEHEN.',
+    ]));
+    wrap.appendChild(block('STRECKEN', [
+      'SECHS KARTEN UNTER STRECKEN - JEDERZEIT UMSCHALTBAR, AUCH MIT TASTE N.',
+      'INNENSTADT, HAFENVIERTEL, BERGPASS, INDUSTRIEPARK, DRIFT-STADION, WINTERSTADT.',
+      'UNTERGRUND ZAEHLT MIT: EIS UND SCHNEE HABEN DEUTLICH WENIGER GRIP.',
     ]));
     wrap.appendChild(block('GELD VERDIENEN', [
       'JEDER GEBANKTE DRIFT BRINGT GELD IN GLEICHER HOEHE.',

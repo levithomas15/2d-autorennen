@@ -1,5 +1,6 @@
 // PIXEL DRIFT CITY - Top-Down-Drift-Simulator im GTA2-Look.
-import { World, TILE, MAP_W, MAP_H, WORLD_W, WORLD_H, T } from './world.js';
+import { World, TILE, T, minimapCanvas } from './world.js';
+import { MAPS, mapById } from './maps.js';
 import { Car, PX_PER_M } from './car.js';
 import { CARS, carById, buildSpec } from './cars.js';
 import { loadGarage, saveGarage, addCash } from './garage.js';
@@ -17,17 +18,20 @@ ctx.imageSmoothingEnabled = false;
 
 const settings = Settings.load();
 const garage = loadGarage();
-const world = new World(20260915);
 const input = new Input(settings);
 const sfx = new Sfx(settings);
 
-const spawn = { x: world.arena.x, y: world.arena.y + world.arena.r * 0.55, h: -Math.PI / 2 };
-const car = new Car(spawn.x, spawn.y, currentSpec());
-car.reset(spawn.x, spawn.y, spawn.h);
+const MAP_KEY = 'pdc_map_v1';
+let world = new World(mapById(localStorage.getItem(MAP_KEY) || 'city'));
+let mini = minimapCanvas(world);
+
+const car = new Car(world.spawn.x, world.spawn.y, currentSpec());
+car.reset(world.spawn.x, world.spawn.y, world.spawn.h);
 
 const cam = { x: car.x, y: car.y, shake: 0 };
 const particles = [];
 const popups = [];
+let skidPrev = null;
 
 const state = {
   score: 0, pending: 0, multiplier: 1,
@@ -58,6 +62,8 @@ const menu = new Menu({
     sfx.applySettings();
   },
   onCarChange: () => { refitCar(); },
+  onMapChange: (id) => { loadMap(id); },
+  mapId: () => world.map.id,
   onPlay: () => {
     state.running = true;
     document.getElementById('controls').classList.add('on');
@@ -67,21 +73,19 @@ const menu = new Menu({
 });
 menu.open('start');
 
-// ------------------------------------------------------------------ Minimap
-const mini = document.createElement('canvas');
-mini.width = MAP_W; mini.height = MAP_H;
-{
-  const g = mini.getContext('2d');
-  for (let ty = 0; ty < MAP_H; ty++) {
-    for (let tx = 0; tx < MAP_W; tx++) {
-      const t = world.get(tx, ty);
-      g.fillStyle =
-        t === T.BUILDING ? '#2a2a34' : t === T.GRASS ? '#2f5136' :
-        t === T.ARENA ? '#5a5a6e' : t === T.LOT ? '#3f3f4c' :
-        t === T.SIDEWALK ? '#43434f' : '#6a6a80';
-      g.fillRect(tx, ty, 1, 1);
-    }
-  }
+// --------------------------------------------------------------- Kartenwahl
+// Karte wechseln: Welt neu bauen, Auto und Kamera zuruecksetzen
+function loadMap(id) {
+  world = new World(mapById(id));
+  mini = minimapCanvas(world);
+  localStorage.setItem(MAP_KEY, id);
+  skidPrev = null;
+  particles.length = 0; popups.length = 0;
+  loseCombo();
+  car.reset(world.spawn.x, world.spawn.y, world.spawn.h);
+  cam.x = car.x; cam.y = car.y;
+  state.cones = 0;
+  say(world.map.name);
 }
 
 // ---------------------------------------------------------------- Skalierung
@@ -104,6 +108,10 @@ input.onKey = (code) => {
   if (code === 'KeyC') cycleCar();
   if (code === 'KeyM') say(sfx.toggle() ? 'SOUND AN' : 'SOUND AUS');
   if (code === 'KeyK') { world.clearSkids(); say('SPUREN GELOESCHT'); }
+  if (code === 'KeyN') {
+    const i = MAPS.findIndex((m) => m.id === world.map.id);
+    loadMap(MAPS[(i + 1) % MAPS.length].id);
+  }
 };
 
 function cycleCar() {
@@ -118,7 +126,7 @@ function cycleCar() {
 }
 
 function resetCar() {
-  car.reset(spawn.x, spawn.y, spawn.h);
+  car.reset(world.spawn.x, world.spawn.y, world.spawn.h);
   cam.x = car.x; cam.y = car.y;
   loseCombo();
   say('RESET');
@@ -137,7 +145,7 @@ function freeSpotNear(x, y) {
       }
     }
   }
-  return { x: spawn.x, y: spawn.y };
+  return { x: world.spawn.x, y: world.spawn.y };
 }
 
 function say(msg) { state.message = msg; state.messageTime = 1.8; }
@@ -225,7 +233,6 @@ function updateParticles(dt) {
 }
 
 // ---------------------------------------------------------------- Skidmarks
-let skidPrev = null;
 function paintSkids() {
   const wheels = car.wheelPositions();
   const slip = Math.abs(car.slip);
@@ -363,8 +370,8 @@ function render() {
   const vw = VIEW_W / z, vh = VIEW_H / z;
   const shx = cam.shake ? (Math.random() - 0.5) * cam.shake : 0;
   const shy = cam.shake ? (Math.random() - 0.5) * cam.shake : 0;
-  const ox = clamp(cam.x - vw / 2 + shx, 0, WORLD_W - vw);
-  const oy = clamp(cam.y - vh / 2 + shy, 0, WORLD_H - vh);
+  const ox = clamp(cam.x - vw / 2 + shx, 0, Math.max(0, world.worldW - vw));
+  const oy = clamp(cam.y - vh / 2 + shy, 0, Math.max(0, world.worldH - vh));
 
   ctx.clearRect(0, 0, VIEW_W, VIEW_H);
   ctx.drawImage(world.canvas, ox, oy, vw, vh, 0, 0, VIEW_W, VIEW_H);
@@ -550,8 +557,8 @@ function drawHud() {
     ctx.fillRect(mx - 2, my - 2, mw + 4, mw + 4);
     ctx.drawImage(mini, 0, 0, mini.width, mini.height, mx, my, mw, mw);
     ctx.fillStyle = '#ffd96b';
-    ctx.fillRect(Math.round(mx + (car.x / WORLD_W) * mw) - 1,
-                 Math.round(my + (car.y / WORLD_H) * mw) - 1, 3, 3);
+    ctx.fillRect(Math.round(mx + (car.x / world.worldW) * mw) - 1,
+                 Math.round(my + (car.y / world.worldH) * mw) - 1, 3, 3);
     ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1;
     ctx.strokeRect(mx - 1.5, my - 1.5, mw + 3, mw + 3);
     drawTextShadow(ctx, 'KEGEL ' + state.cones, mx, my + mw + 5, 1, '#b9b9cf');
@@ -576,4 +583,5 @@ function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 requestAnimationFrame(frame);
 
 // Debug-Zugriff aus der Konsole: __dbg.car, __dbg.state, __dbg.settings
-window.__dbg = { car, state, input, world, settings, garage, menu };
+window.__dbg = { car, state, input, settings, garage, menu, MAPS, loadMap,
+  get world() { return world; } };

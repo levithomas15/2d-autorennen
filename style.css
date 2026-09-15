@@ -188,6 +188,25 @@ button.buy.wide { width: 100%; margin-top: 16px; }
 @keyframes nope { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 .nope { animation: nope .22s; }
 
+/* ---------------------------------------------------------------- Strecken */
+.mapList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); }
+.mapCard {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+  padding: 10px; text-align: left;
+  background: #1b1b2b; border: 2px solid #2e2e46; border-radius: 8px;
+  color: #d5d5e6; cursor: pointer;
+  font: bold 12px "Courier New", monospace; letter-spacing: 1px;
+}
+.mapCard.sel { border-color: #ffd96b; background: #262640; }
+.mapCard .small { text-transform: none; min-height: 30px; }
+.mapShot {
+  height: 116px; display: flex; align-items: center; justify-content: center;
+  background: #0d0d16; border-radius: 6px; overflow: hidden;
+}
+.mapShot canvas { image-rendering: pixelated; height: 108px; width: auto; }
+.mapSize { font-size: 10px; color: #6f6f8c; letter-spacing: 1px; }
+.mapList > p.small { grid-column: 1 / -1; margin-top: 4px; }
+
 /* ----------------------------------------------------------- Einstellungen */
 .settings { display: grid; gap: 18px; }
 .setGroup { background: #17172a; border: 2px solid #2e2e46; border-radius: 8px; padding: 12px; }
