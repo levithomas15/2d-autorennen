@@ -1,0 +1,115 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  background: #0a0a10;
+  overflow: hidden;
+  font-family: "Courier New", monospace;
+  color: #e8e8f0;
+  -webkit-user-select: none; user-select: none;
+  touch-action: none;
+}
+
+#stage {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 40%, #1a1a2e 0%, #07070c 70%);
+}
+
+#screen {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  background: #1b1b22;
+  box-shadow: 0 0 0 2px #2c2c3c, 0 18px 60px rgba(0,0,0,.8);
+}
+
+/* ---------- Lenkrad + Pedale ---------- */
+#controls {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  display: none;
+}
+#controls.on { display: block; }
+
+#wheelBox {
+  position: absolute;
+  left: 18px; bottom: 18px;
+  width: 168px; height: 168px;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+#wheelBox:active { cursor: grabbing; }
+#wheel { width: 100%; height: 100%; display: block; }
+
+#pedals {
+  position: absolute;
+  right: 18px; bottom: 18px;
+  display: flex; gap: 10px;
+  pointer-events: auto;
+}
+.pedal {
+  pointer-events: auto;
+  width: 78px; height: 78px;
+  border-radius: 12px;
+  border: 2px solid #4a4a66;
+  background: rgba(24,24,38,.72);
+  color: #cfcfe4;
+  font: bold 12px "Courier New", monospace;
+  letter-spacing: 1px;
+  cursor: pointer;
+  touch-action: none;
+}
+.pedal.down { background: #ff9d2e; color: #17111f; border-color: #ffd08a; }
+#pGas { width: 96px; }
+
+/* ---------- Titelscreen ---------- */
+#overlay {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6,6,12,.82);
+  backdrop-filter: blur(2px);
+  text-align: center;
+  z-index: 10;
+}
+#overlay.hidden { display: none; }
+
+#title h1 {
+  font-size: clamp(28px, 7vw, 62px);
+  letter-spacing: 4px;
+  color: #ffd96b;
+  text-shadow: 3px 3px 0 #b8331f, 6px 6px 0 rgba(0,0,0,.5);
+}
+#title h1 span { color: #ff6b4a; }
+.sub {
+  margin-top: 6px; color: #8ee6c8; letter-spacing: 3px;
+  font-size: clamp(11px, 2.2vw, 15px);
+}
+.keys {
+  margin: 26px auto 0; line-height: 2;
+  font-size: clamp(11px, 2vw, 14px);
+  color: #b9b9cf;
+}
+.keys b {
+  display: inline-block; min-width: 20px;
+  padding: 1px 7px; margin: 0 2px;
+  background: #23233a; border: 1px solid #45456a; border-radius: 4px;
+  color: #ffd96b;
+}
+#startBtn {
+  margin-top: 28px; padding: 14px 44px;
+  font: bold 18px "Courier New", monospace; letter-spacing: 4px;
+  color: #17111f; background: #ffd96b;
+  border: none; border-radius: 6px; cursor: pointer;
+  box-shadow: 0 5px 0 #b8331f;
+}
+#startBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8331f; }
+
+@media (max-width: 620px) {
+  #wheelBox { width: 124px; height: 124px; left: 10px; bottom: 10px; }
+  .pedal { width: 62px; height: 62px; }
+  #pGas { width: 74px; }
+  #pedals { right: 10px; bottom: 10px; gap: 7px; }
+}

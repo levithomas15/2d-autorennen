@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>PIXEL DRIFT CITY</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="screen" width="480" height="270"></canvas>
+
+  <div id="overlay">
+    <div id="title">
+      <h1>PIXEL<span>DRIFT</span>CITY</h1>
+      <p class="sub">Top-Down Drift Simulator</p>
+      <div class="keys">
+        <div><b>W</b> / <b>&uarr;</b> Gas &nbsp;&nbsp; <b>S</b> / <b>&darr;</b> Bremse &amp; R&uuml;ckw&auml;rts</div>
+        <div><b>A</b> <b>D</b> / <b>&larr;</b> <b>&rarr;</b> Lenken &nbsp;&nbsp; <b>LEERTASTE</b> Handbremse</div>
+        <div><b>Lenkrad ziehen</b> (Maus / Touch) zum Lenken</div>
+        <div><b>R</b> Reset &nbsp;&nbsp; <b>C</b> Auto wechseln &nbsp;&nbsp; <b>M</b> Sound</div>
+      </div>
+      <button id="startBtn">START</button>
+    </div>
+  </div>
+
+  <!-- Lenkrad + Touch-Pedale -->
+  <div id="controls">
+    <div id="wheelBox">
+      <canvas id="wheel" width="220" height="220"></canvas>
+    </div>
+    <div id="pedals">
+      <button class="pedal" id="pBrake">BRAKE</button>
+      <button class="pedal" id="pHand">HAND</button>
+      <button class="pedal" id="pGas">GAS</button>
+    </div>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
