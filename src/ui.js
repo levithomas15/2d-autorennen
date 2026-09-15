@@ -148,7 +148,7 @@ export class Menu {
       const owned = !!this.garage.owned[c.id];
       const sel = this.garage.selected === c.id;
       const card = el('button', 'carCard' + (sel ? ' sel' : '') + (owned ? '' : ' locked'));
-      card.appendChild(carThumb(c, this.garage.cars[c.id].paint));
+      card.appendChild(carThumb(c, this.garage.cars[c.id].paint, 100));
       card.appendChild(el('b', '', c.name));
       card.appendChild(el('span', 'price', owned ? (sel ? 'AKTIV' : 'BESITZT')
         : '$ ' + c.price.toLocaleString('de-DE')));
@@ -172,7 +172,7 @@ export class Menu {
 
     const panel = el('div', 'tunePanel');
     const head = el('div', 'tuneHead');
-    head.appendChild(carThumb(car, tune.paint, 3));
+    head.appendChild(carThumb(car, tune.paint, 190));
     const info = el('div', '');
     info.appendChild(el('h3', '', car.name));
     info.appendChild(el('p', 'small', car.blurb));
@@ -401,16 +401,18 @@ function flash(node) {
 }
 
 // Vorschaubild: dasselbe Sprite wie im Spiel, nur vergroessert
-function carThumb(car, paint, scale = 2) {
+function carThumb(car, paint, displayW = 104) {
   const spec = buildSpec(car, { paint }, { driftIntensity: 1 });
   const sprite = makeCarPreview(spec);
   const c = document.createElement('canvas');
-  c.width = sprite.width * scale; c.height = sprite.height * scale;
+  c.width = sprite.width; c.height = sprite.height;
   c.className = 'thumb';
-  c.style.width = sprite.width * scale * 2 + 'px';
-  c.style.height = sprite.height * scale * 2 + 'px';
+  // Anzeigegroesse an der Fahrzeuglaenge ausrichten, damit die Karten passen
+  const scale = displayW / sprite.width;
+  c.style.width = Math.round(sprite.width * scale) + 'px';
+  c.style.height = Math.round(sprite.height * scale) + 'px';
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = false;
-  g.drawImage(sprite, 0, 0, c.width, c.height);
+  g.drawImage(sprite, 0, 0);
   return c;
 }

@@ -11,12 +11,18 @@ import { Menu } from './ui.js';
 import { drawTextShadow, textWidth } from './font.js';
 import { LightLayer, AMBIENT } from './light.js';
 
+// Sichtbarer Ausschnitt in Welt-Pixeln. Gezeichnet wird mit doppelter
+// Aufloesung (RS), damit Fahrzeuge, Hindernisse und Licht doppelt so fein
+// aufgeloest sein koennen wie die Kacheln der Welt.
 const VIEW_W = 480, VIEW_H = 270;
+export const RS = 2;
+const CW = VIEW_W * RS, CH = VIEW_H * RS;
 
 const screen = document.getElementById('screen');
+screen.width = CW; screen.height = CH;
 const ctx = screen.getContext('2d');
 ctx.imageSmoothingEnabled = false;
-const light = new LightLayer(VIEW_W, VIEW_H);
+const light = new LightLayer(CW, CH);
 
 const settings = Settings.load();
 const garage = loadGarage();
@@ -465,12 +471,12 @@ function render() {
   const ox = clamp(cam.x - vw / 2 + shx, 0, Math.max(0, world.worldW - vw));
   const oy = clamp(cam.y - vh / 2 + shy, 0, Math.max(0, world.worldH - vh));
 
-  ctx.clearRect(0, 0, VIEW_W, VIEW_H);
-  ctx.drawImage(world.canvas, ox, oy, vw, vh, 0, 0, VIEW_W, VIEW_H);
-  ctx.drawImage(world.skid.canvas, ox, oy, vw, vh, 0, 0, VIEW_W, VIEW_H);
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.drawImage(world.canvas, ox, oy, vw, vh, 0, 0, CW, CH);
+  ctx.drawImage(world.skid.canvas, ox, oy, vw, vh, 0, 0, CW, CH);
 
   ctx.save();
-  ctx.scale(z, z);
+  ctx.scale(z * RS, z * RS);
   ctx.translate(-ox, -oy);
 
   if (world.hasWater) drawWaterWaves(ox, oy, vw, vh);
@@ -499,6 +505,8 @@ function render() {
 
   if (settings.daytime > 0) paintLights(z, ox, oy);
 
+  ctx.save();
+  ctx.scale(RS, RS);
   drawWeather();
   if (settings.grade) paintGrade();
 
@@ -519,13 +527,14 @@ function render() {
   }
 
   drawHud();
+  ctx.restore();
 }
 
 // Lichtkarte aufbauen: Laternen, Fenster, Scheinwerfer, Brems- und Neonlicht
 function paintLights(z, ox, oy) {
   const vw = VIEW_W / z, vh = VIEW_H / z;
   light.begin();
-  light.setTransform(z, ox, oy);
+  light.setTransform(z * RS, ox, oy);
 
   if (settings.cityLights) {
     for (const L of world.lights) {
@@ -727,31 +736,48 @@ function drawParticle(g, p) {
 }
 
 function drawProp(g, p) {
-  const x = Math.round(p.x), y = Math.round(p.y);
+  const x = p.x, y = p.y;
   const down = p.hit > 0;
 
-  g.fillStyle = 'rgba(0,0,0,.36)';
+  // Schlagschatten
+  g.fillStyle = 'rgba(0,0,0,.4)';
   g.beginPath();
-  g.ellipse(x + 2, y + 2, down ? 5 : 4, down ? 3 : 3, 0, 0, Math.PI * 2);
+  g.ellipse(x + 1.6, y + 1.8, down ? 4.6 : 3.4, down ? 2.6 : 2.4, 0, 0, Math.PI * 2);
   g.fill();
 
   if (p.type === 'cone') {
     if (down) {                                   // umgefahren: liegt flach
-      g.fillStyle = '#c4622f'; g.fillRect(x - 4, y - 1, 8, 3);
-      g.fillStyle = '#e9e9f0'; g.fillRect(x, y - 1, 2, 3);
+      g.fillStyle = '#b8581f'; g.fillRect(x - 4, y - 1.5, 8, 3);
+      g.fillStyle = '#e9e9f0'; g.fillRect(x - 0.5, y - 1.5, 2, 3);
+      g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(x - 4, y + 1, 8, 0.5);
       return;
     }
-    g.fillStyle = '#d96a24'; g.fillRect(x - 3, y - 3, 7, 7);      // Fuss
-    g.fillStyle = '#ff8a3c'; g.fillRect(x - 2, y - 3, 5, 6);      // Kegel
-    g.fillStyle = '#ffab6d'; g.fillRect(x - 2, y - 3, 2, 6);      // Lichtkante
-    g.fillStyle = '#f4f4fa'; g.fillRect(x - 2, y - 1, 5, 2);      // Reflexband
+    // Fuss
+    g.fillStyle = '#b3541f';
+    g.fillRect(x - 3.5, y - 3.5, 7, 7);
+    g.fillStyle = '#c96227';
+    g.fillRect(x - 3.5, y - 3.5, 7, 1);
+    // Kegelkoerper, nach oben schmaler
+    g.fillStyle = '#e9762c';
+    g.fillRect(x - 2.5, y - 2.5, 5, 5);
+    g.fillStyle = '#ff9448';
+    g.fillRect(x - 2.5, y - 2.5, 2, 5);           // Lichtseite
+    g.fillStyle = '#f4f4fa';
+    g.fillRect(x - 2.5, y - 1, 5, 1.5);           // Reflexband
+    g.fillStyle = 'rgba(255,255,255,.5)';
+    g.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);       // Spitze
   } else {
-    g.fillStyle = down ? '#5d6a76' : '#8996a4';
-    g.fillRect(x - 3, y - 3, 7, 7);
-    g.fillStyle = down ? '#6d7a86' : '#a7b4c2';
-    g.fillRect(x - 3, y - 3, 3, 7);
-    g.fillStyle = '#d24a3a'; g.fillRect(x - 3, y - 1, 7, 2);
-    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x + 2, y - 3, 1, 7);
+    // Fass mit Deckelring
+    g.fillStyle = down ? '#4f5a66' : '#78838f';
+    g.beginPath(); g.arc(x, y, 3.6, 0, Math.PI * 2); g.fill();
+    g.fillStyle = down ? '#5d6874' : '#94a0ad';
+    g.beginPath(); g.arc(x - 0.5, y - 0.5, 2.8, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#c0392b';
+    g.fillRect(x - 3.4, y - 1, 6.8, 2);
+    g.fillStyle = 'rgba(255,255,255,.28)';
+    g.fillRect(x - 3.4, y - 1, 6.8, 0.6);
+    g.fillStyle = 'rgba(0,0,0,.3)';
+    g.beginPath(); g.arc(x, y, 1.2, 0, Math.PI * 2); g.fill();
   }
 }
 

@@ -142,12 +142,25 @@ Bremslichter und das Neon unter dem Auto. Lichter und Umgebungslicht liegen auf
 getrennten Ebenen – nur die Lichtebene wird additiv als Schein darübergelegt,
 damit der Schein die dunklen Flächen nicht flach aufhellt.
 
-**Fahrzeuge**: Jedes Modell hat ein eigenes Breitenprofil und damit eine eigene
-Silhouette – vom kantigen MUSCLE bis zum keilförmigen HYPER. Dazu Dach in
-Wagenfarbe, Front- und Heckscheibe, Seitenscheiben, Spiegel, Heckflügel,
-Lichtkanten, Schlagschatten und vier Räder, von denen die vorderen mitlenken
-und deren Felgen bei durchdrehenden Reifen aufblitzen. Bremslichter leuchten
-beim Bremsen auf.
+**Auflösung**: Die Szene wird mit doppelter Auflösung gezeichnet (960 × 540
+statt 480 × 270). Die Kacheln der Welt bleiben dadurch gleich grob, aber
+Fahrzeuge, Hindernisse, Licht und Niederschlag haben doppelt so viele
+Bildpunkte zur Verfügung.
+
+**Fahrzeuge**: Der Umriss entsteht als Pfad aus einem Breitenprofil je Modell –
+vom kantigen MUSCLE bis zum keilförmigen HYPER – und wird in klaren Farbstufen
+schattiert statt mit weichen Verläufen, damit das Bild scharf bleibt. Licht- und
+Schattentöne sind dabei farbverschoben (warm aufhellen, kühl abdunkeln); reines
+Weiß lässt rote Lacke sonst rosa wirken. Dazu Front- und Heckscheibe mit
+Spiegelstreifen, Seitenscheiben, durchlaufende Zierstreifen unter dem Glas,
+Türfugen, Radhäuser, Außenspiegel, Stoßfänger mit Grill, Scheinwerfer und
+Rückleuchten mit Gehäuse, Auspuffendrohre sowie modellabhängige Details:
+Hutze beim MUSCLE, Lufteinlässe beim HYPER, breite Kotflügel beim SLIDEKING,
+Heckflügel mit Stützen bei den getunten Modellen. Umgeben von einer dunklen
+Kontur für klare Silhouette, darunter ein weicher Schlagschatten aus mehreren
+versetzten Kopien. Die vier Räder sind eigene Sprites mit Reifenflanke und
+Felge, die vorderen lenken mit, beim Durchdrehen verwischt die Felge.
+Bremslichter leuchten beim Bremsen auf.
 
 **Umgebung**: Asphalt bekommt Körnung, Risse, Flicken und Kanaldeckel,
 Bürgersteige Plattenfugen, Parkflächen Stellplatzmarkierungen, Wasser
@@ -159,7 +172,8 @@ Bäume.
 
 **Effekte**: Reifenspuren aus breitem Abrieb mit dunklem Kern, Rauch als weiche
 Wolken statt Quadrate, Funken beim Aufprall, Staub in der Farbe des Untergrunds,
-wandernde Wellenkämme auf dem Wasser.
+wandernde Wellenkämme auf dem Wasser. Pylonen und Fässer sind plastisch
+schattiert und liegen umgefahren flach auf der Straße.
 
 ## Fahrphysik
 
