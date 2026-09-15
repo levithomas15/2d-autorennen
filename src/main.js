@@ -10,6 +10,7 @@ import { Sfx } from './audio.js';
 import { Menu } from './ui.js';
 import { drawTextShadow, textWidth } from './font.js';
 import { LightLayer, AMBIENT } from './light.js';
+import { EgoView } from './ego.js';
 
 // Sichtbarer Ausschnitt in Welt-Pixeln. Gezeichnet wird mit doppelter
 // Aufloesung (RS), damit Fahrzeuge, Hindernisse und Licht doppelt so fein
@@ -23,6 +24,7 @@ screen.width = CW; screen.height = CH;
 const ctx = screen.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 const light = new LightLayer(CW, CH);
+const ego = new EgoView(VIEW_W, VIEW_H);
 
 const settings = Settings.load();
 const garage = loadGarage();
@@ -74,6 +76,36 @@ const menu = new Menu({
   onCarChange: () => { refitCar(); },
   onMapChange: (id) => { loadMap(id); },
   mapId: () => world.map.id,
+  tools: {
+    addCash: (n) => { addCash(garage, n); },
+    unlockAll: () => {
+      for (const c of CARS) garage.owned[c.id] = true;
+      saveGarage(garage);
+    },
+    maxTune: () => {
+      const t = garage.cars[garage.selected];
+      for (const k of ['engine', 'turbo', 'tires', 'chassis', 'gearbox']) t[k] = 3;
+      t.glow = true;
+      saveGarage(garage);
+      refitCar();
+    },
+    resetCar: () => resetCar(),
+    clearSkids: () => world.clearSkids(),
+    resetScore: () => {
+      state.score = 0; state.best = 0; state.cones = 0;
+      localStorage.setItem('pdc_best', '0');
+    },
+    teleportArena: () => {
+      const a = world.arena;
+      if (!a) { say('KEINE ARENA AUF DIESER STRECKE'); return; }
+      car.reset(a.x, a.y + a.r * 0.5, -Math.PI / 2);
+      cam.x = car.x; cam.y = car.y; cam.lookX = 0; cam.lookY = 0;
+    },
+    status: () => ({
+      cash: garage.cash, score: state.score, best: state.best, cones: state.cones,
+      map: world.map.name, car: car.spec.name, kmh: Math.round(car.kmh),
+    }),
+  },
   onPlay: () => {
     state.running = true;
     document.getElementById('controls').classList.add('on');
@@ -122,6 +154,21 @@ addEventListener('touchmove', (e) => { if (!inMenu(e.target)) e.preventDefault()
 addEventListener('gesturestart', (e) => e.preventDefault());
 addEventListener('gesturechange', (e) => e.preventDefault());
 addEventListener('contextmenu', (e) => { if (!inMenu(e.target)) e.preventDefault(); });
+
+// Dreimal kurz in die obere rechte Ecke tippen oeffnet das Werkzeugmenue
+let cornerTaps = 0, cornerTime = 0;
+addEventListener('pointerdown', (e) => {
+  if (menu.isOpen || inMenu(e.target)) return;
+  const inCorner = e.clientX > innerWidth * 0.80 && e.clientY < innerHeight * 0.20;
+  const now = performance.now();
+  if (!inCorner || now - cornerTime > 1400) { cornerTaps = inCorner ? 1 : 0; cornerTime = now; return; }
+  cornerTime = now;
+  if (++cornerTaps >= 3) {
+    cornerTaps = 0;
+    menu.open('tools');
+    sfx.blip(880, 0.08);
+  }
+});
 addEventListener('dblclick', (e) => { if (!inMenu(e.target)) e.preventDefault(); });
 
 // --------------------------------------------------------------- Tasteneingabe
@@ -135,6 +182,11 @@ input.onKey = (code) => {
   if (code === 'KeyC') cycleCar();
   if (code === 'KeyM') say(sfx.toggle() ? 'SOUND AN' : 'SOUND AUS');
   if (code === 'KeyK') { world.clearSkids(); say('SPUREN GELOESCHT'); }
+  if (code === 'KeyV') {
+    settings.view = settings.view ? 0 : 1;
+    Settings.save(settings);
+    say(settings.view ? 'EGO-KAMERA' : 'VERFOLGER-KAMERA');
+  }
   if (code === 'KeyN') {
     const i = MAPS.findIndex((m) => m.id === world.map.id);
     loadMap(MAPS[(i + 1) % MAPS.length].id);
@@ -486,6 +538,54 @@ function paintGrade() {
 
 // ---------------------------------------------------------------- Rendering
 function render() {
+  if (settings.view === 1) { renderEgo(); return; }
+  renderChase();
+}
+
+// ------------------------------------------------------------ Ego-Perspektive
+function renderEgo() {
+  const amb = settings.daytime;
+  // leichtes Nicken und Wanken, damit die Sicht lebendig wirkt
+  const bob = Math.sin(performance.now() / 260) * 0.25 + Math.min(2, car.speed * 0.02);
+  ego.setCamera(car, bob);
+
+  ctx.setTransform(RS, 0, 0, RS, 0, 0);
+  ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+  ego.drawSky(ctx, amb, settings.weather);
+  ego.drawGround(ctx, world, RS, settings.skidmarks);
+  ctx.setTransform(RS, 0, 0, RS, 0, 0);
+  ego.drawFog(ctx, amb, settings.weather);
+  ego.drawBuildings(ctx, world);
+  ego.drawProps(ctx, world);
+  if (settings.headlights) ego.drawHeadlights(ctx, amb);
+
+  // Umgebungslicht als flacher Durchgang - die Lichtkarte der Aufsicht passt
+  // in dieser Projektion nicht
+  if (amb > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = AMBIENT[amb];
+    ctx.fillRect(0, ego.horizon, VIEW_W, VIEW_H - ego.horizon);
+    ctx.restore();
+  }
+
+  ego.drawCockpit(ctx, car, input.steer, lastCtl && (lastCtl.brake > 0 || lastCtl.handbrake > 0));
+
+  drawWeather();
+  if (settings.grade) paintGrade();
+  if (state.flash > 0) {
+    ctx.fillStyle = `rgba(255,220,160,${state.flash * 1.6})`;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+  if (settings.scanlines) {
+    ctx.fillStyle = 'rgba(0,0,0,.16)';
+    for (let y = 0; y < VIEW_H; y += 2) ctx.fillRect(0, y, VIEW_W, 1);
+  }
+  drawHud();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function renderChase() {
   const z = settings.zoom;
   const vw = VIEW_W / z, vh = VIEW_H / z;
   const shx = cam.shake ? (Math.random() - 0.5) * cam.shake : 0;
@@ -514,8 +614,7 @@ function render() {
 
   if (settings.underglow && car.spec.glow) drawUnderglow(ctx);
 
-  car.drawShadow(ctx);
-  car.draw(ctx, lastCtl);
+  drawCar3D(ctx, ox, oy, vw, vh);
 
   for (const p of particles) if (p.air) drawParticle(ctx, p);
 
@@ -587,6 +686,59 @@ function paintLights(z, ox, oy) {
   }
   light.composite(ctx, AMBIENT[settings.daytime], settings.bloom);
   if (settings.weather === 1) light.wetReflection(ctx, 0.16);
+}
+
+// Das Auto wird genauso aufgebaut wie die Haeuser: Grundriss am Boden, die
+// Karosserie darueber, dazwischen die Seitenflaechen. Weil die Kamera dem Wagen
+// vorausblickt, sitzt er selten genau in der Bildmitte - dadurch sieht man im
+// Fahrbetrieb tatsaechlich die Flanken.
+function drawCar3D(g, ox, oy, vw, vh) {
+  const s = car.spec;
+  const height = 7.5 * settings.carDepth;
+  const camCX = ox + vw / 2, camCY = oy + vh / 2;
+  const px = (car.x - camCX) / (vw / 2);
+  const py = (car.y - camCY) / (vh / 2);
+  const k = settings.parallax * height;
+  const dx = px * k, dy = py * k;
+
+  car.drawShadow(g, 2.5 + dx * 0.5, 3.5 + dy * 0.5);
+  car.drawWheels(g);
+
+  if (Math.abs(dx) > 0.2 || Math.abs(dy) > 0.2) {
+    const c = car.corners();
+    const dark = shadeHex(s.body, -0.5);
+    const mid = shadeHex(s.body, -0.32);
+    for (let i = 0; i < 4; i++) {
+      const p0 = c[i], p1 = c[(i + 1) % 4];
+      const mx = (p0.x + p1.x) / 2 - car.x, my = (p0.y + p1.y) / 2 - car.y;
+      if (mx * dx + my * dy <= 0) continue;          // Flanke zeigt zur Kamera
+      g.fillStyle = i % 2 ? mid : dark;
+      g.beginPath();
+      g.moveTo(p0.x, p0.y);
+      g.lineTo(p1.x, p1.y);
+      g.lineTo(p1.x + dx, p1.y + dy);
+      g.lineTo(p0.x + dx, p0.y + dy);
+      g.closePath();
+      g.fill();
+      g.fillStyle = 'rgba(0,0,0,.22)';               // Verschattung am Fuss
+      g.beginPath();
+      g.moveTo(p0.x, p0.y);
+      g.lineTo(p1.x, p1.y);
+      g.lineTo(p1.x + dx * 0.4, p1.y + dy * 0.4);
+      g.lineTo(p0.x + dx * 0.4, p0.y + dy * 0.4);
+      g.closePath();
+      g.fill();
+    }
+  }
+  car.drawBody(g, dx, dy, lastCtl);
+}
+
+function shadeHex(hex, amt) {
+  if (hex[0] !== '#') return hex;
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, gg = (n >> 8) & 255, b = n & 255;
+  const f = (v) => Math.max(0, Math.min(255, Math.round(amt < 0 ? v * (1 + amt) : v + (255 - v) * amt)));
+  return `rgb(${f(r)},${f(gg)},${f(b)})`;
 }
 
 // Haeuser mit Hoehe: die Waende neigen sich von der Bildmitte weg, genau wie

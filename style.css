@@ -203,6 +203,9 @@ button.buy.wide { width: 100%; margin-top: 16px; }
 @keyframes nope { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 .nope { animation: nope .22s; }
 
+.toolButtons { display: flex; flex-wrap: wrap; gap: 7px; }
+.toolButtons button.buy { min-width: 128px; flex: 0 1 auto; }
+
 /* ---------------------------------------------------------------- Strecken */
 .mapList { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); }
 .mapCard {

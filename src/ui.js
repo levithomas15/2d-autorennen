@@ -29,6 +29,7 @@ export class Menu {
     this.onCarChange = opts.onCarChange || (() => {});
     this.onMapChange = opts.onMapChange || (() => {});
     this.mapId = opts.mapId || (() => MAPS[0].id);
+    this.tools = opts.tools || null;
     this.onPlay = opts.onPlay || (() => {});
     this.tab = 'start';
     this.started = false;
@@ -62,6 +63,7 @@ export class Menu {
     this.cashEl.textContent = '$ ' + this.garage.cash.toLocaleString('de-DE');
     this.bodyEl.innerHTML = '';
     if (this.tab === 'start') this.renderStart();
+    else if (this.tab === 'tools') this.renderTools();
     else if (this.tab === 'maps') this.renderMaps();
     else if (this.tab === 'garage') this.renderGarage();
     else if (this.tab === 'settings') this.renderSettings();
@@ -76,6 +78,7 @@ export class Menu {
       ['settings', 'EINSTELLUNGEN'],
       ['help', 'HILFE'],
     ];
+    if (this.tab === 'tools') tabs.push(['tools', 'WERKZEUG']);
     this.tabsEl.innerHTML = '';
     for (const [id, label] of tabs) {
       const b = el('button', 'tab' + (this.tab === id ? ' active' : ''), label);
@@ -110,6 +113,82 @@ export class Menu {
     hint.appendChild(el('span', '', 'ESC MENUE'));
     box.appendChild(hint);
     this.bodyEl.appendChild(box);
+  }
+
+  // --------------------------------------------------------------- Werkzeug
+  // Erreichbar ueber dreimaliges Tippen in die obere rechte Ecke.
+  renderTools() {
+    const t = this.tools;
+    const wrap = el('div', 'settings');
+
+    const st = t && t.status ? t.status() : {};
+    const head = el('div', 'setGroup');
+    head.appendChild(el('h3', '', 'WERKZEUGKASTEN'));
+    head.appendChild(el('p', 'small',
+      'Geoeffnet durch dreimaliges Tippen in die obere rechte Ecke. Hier laesst ' +
+      'sich alles schnell einstellen, ohne den Weg ueber die anderen Reiter.'));
+    const stats = el('div', 'hintRow');
+    for (const [k, v] of [['STRECKE', st.map], ['AUTO', st.car], ['GELD', st.cash],
+                          ['PUNKTE', st.score], ['BESTWERT', st.best], ['KEGEL', st.cones]]) {
+      if (v === undefined) continue;
+      stats.appendChild(el('span', '', k + ': ' + v));
+    }
+    head.appendChild(stats);
+    wrap.appendChild(head);
+
+    wrap.appendChild(this.toolRow('GELD', [
+      ['+ 10.000', () => t.addCash(10000)],
+      ['+ 100.000', () => t.addCash(100000)],
+      ['ALLE AUTOS FREI', () => t.unlockAll()],
+      ['TUNING AUF MAX', () => t.maxTune()],
+    ]));
+
+    wrap.appendChild(this.toolRow('FAHRZEUG', [
+      ['AUTO WECHSELN', () => {
+        const owned = CARS.filter((c) => this.garage.owned[c.id]);
+        const i = owned.findIndex((c) => c.id === this.garage.selected);
+        this.garage.selected = owned[(i + 1) % owned.length].id;
+        saveGarage(this.garage); this.onCarChange();
+      }],
+      ['ZURUECKSETZEN', () => t.resetCar()],
+      ['ZUR ARENA', () => t.teleportArena()],
+      ['SPUREN LOESCHEN', () => t.clearSkids()],
+    ]));
+
+    // Strecken als Schnellwahl
+    wrap.appendChild(this.toolRow('STRECKE', MAPS.map((m) => [
+      m.name, () => this.onMapChange(m.id),
+    ])));
+
+    // haeufig genutzte Einstellungen direkt hier
+    const quick = el('div', 'setGroup');
+    quick.appendChild(el('h3', '', 'SCHNELLEINSTELLUNG'));
+    for (const key of ['view', 'daytime', 'weather', 'shifterMode', 'driftIntensity',
+                       'carDepth', 'parallax', 'zoom']) {
+      const item = findItem(key);
+      if (item) quick.appendChild(this.settingRow(item));
+    }
+    wrap.appendChild(quick);
+
+    wrap.appendChild(this.toolRow('ZURUECKSETZEN', [
+      ['PUNKTE AUF NULL', () => { t.resetScore(); this.render(); }],
+      ['GELD AUF NULL', () => { this.garage.cash = 0; saveGarage(this.garage); this.render(); }],
+    ]));
+
+    this.bodyEl.appendChild(wrap);
+  }
+
+  toolRow(title, actions) {
+    const g = el('div', 'setGroup');
+    g.appendChild(el('h3', '', title));
+    const row = el('div', 'toolButtons');
+    for (const [label, fn] of actions) {
+      const b = el('button', 'buy', label);
+      b.onclick = () => { fn(); this.render(); };
+      row.appendChild(b);
+    }
+    g.appendChild(row);
+    return g;
   }
 
   // ---------------------------------------------------------------- Strecken
@@ -376,6 +455,12 @@ export class Menu {
 }
 
 // ----------------------------------------------------------------- Helfer
+// Einstellungs-Eintrag anhand seines Schluessels finden
+function findItem(key) {
+  for (const g of SCHEMA) for (const it of g.items) if (it.key === key) return it;
+  return null;
+}
+
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;

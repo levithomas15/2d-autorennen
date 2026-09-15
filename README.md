@@ -59,6 +59,7 @@ mitgeändert werden.
 | `C` | Auto wechseln |
 | `M` | Sound an/aus |
 | `N` | Strecke wechseln |
+| `V` | Kamera: Verfolger / Ego |
 | `K` | Reifenspuren löschen |
 | `Esc` / `P` | Menü |
 
@@ -98,6 +99,15 @@ Die Auswahl wird gespeichert.
 Der Untergrund zählt in der Physik mit – Asphalt und Beton greifen voll,
 Schotter und Schnee deutlich weniger, Sand bremst stark und Eis hat fast
 keinen Grip. Wasser, Fels, Gebäude und Banden sind fest.
+
+## Werkzeugmenü
+
+Dreimal kurz in die **obere rechte Ecke** tippen öffnet einen Werkzeugkasten:
+Geld hinzufügen, alle Autos freischalten, Tuning auf Maximum, Fahrzeug
+wechseln oder zurücksetzen, zur Arena springen, Reifenspuren löschen, Strecke
+direkt wählen und die wichtigsten Einstellungen (Kamera, Tageszeit, Wetter,
+Gangschaltung, Drift-Intensität, Fahrzeug-Tiefe, Gebäudehöhe, Zoom) an einer
+Stelle – ohne den Weg über die anderen Reiter.
 
 ## Garage
 
@@ -148,6 +158,24 @@ Stadt eignen sich für Donuts.
 ## Grafik
 
 Alles ist prozedural gezeichnet, kein einziges Bild-Asset.
+
+**Ego-Perspektive** (`src/ego.js`): Mit `V` oder über die Einstellungen wechselt
+die Kamera ins Fahrzeug – in echter Zentralprojektion. Der Boden entsteht
+zeilenweise: Für jede Bildzeile unterhalb des Horizonts steht die Entfernung
+fest, daraus folgt eine affine Abbildung Welt → Bildschirm, mit der die
+vorgerenderte Karte streifenweise gezeichnet wird. Häuser, Banden und Felsen
+werden als echte Körper projiziert (mit Abschneiden an der vorderen Ebene,
+sonst kippen Punkte hinter der Kamera das Bild), Pylonen und Fässer als
+aufgestellte Flächen. Dazu Himmelsverlauf je Tageszeit, Dunst über der
+Entfernung, ein auf den Boden projizierter Scheinwerferkegel und ein Cockpit
+mit Motorhaube in Wagenfarbe, A-Säulen, Innenspiegel, Armaturenbrett und einem
+Lenkrad, das sich mitdreht.
+
+**Das Auto hat Höhe wie die Häuser**: Die Räder stehen auf dem Boden, die
+Karosserie liegt darüber, dazwischen werden die Flanken aufgespannt – nach
+demselben Verfahren wie bei den Gebäuden. Weil die Kamera dem Wagen
+vorausblickt, sitzt er im Fahrbetrieb selten genau in der Bildmitte, und
+dadurch sieht man seine Seiten. Stärke über *Fahrzeug-Tiefe (3D)*.
 
 **Häuser mit Höhe**: Jedes Gebäude hat eine eigene Höhe, und die Wände neigen
 sich pro Bild von der Bildmitte weg – derselbe Trick, mit dem GTA 2 seine Stadt
@@ -247,6 +275,7 @@ schattiert und liegen umgefahren flach auf der Straße.
 | `src/maps.js` | die sechs Karten und ihre Generatoren |
 | `src/input.js` | Tastatur, Lenkrad, Pedale, Schalthebel |
 | `src/light.js` | Dynamische Beleuchtung, Lichtkarte und Schein |
+| `src/ego.js` | Ego-Perspektive: Bodenprojektion, Körper, Cockpit |
 | `src/audio.js` | Prozeduraler Motor-, Reifen- und Crash-Sound |
 | `src/font.js` | 3×5-Pixel-Font fürs HUD |
 | `.github/workflows/pages.yml` | Veröffentlichung auf GitHub Pages |

@@ -39,6 +39,11 @@ export const SCHEMA = [
   {
     group: 'OPTIK',
     items: [
+      { key: 'view', label: 'KAMERA', type: 'choice', options: ['VERFOLGER', 'EGO'], def: 0,
+        help: 'EGO zeigt die Sicht aus dem Fahrzeug in Zentralprojektion (Taste V).' },
+      { key: 'carDepth', label: 'FAHRZEUG-TIEFE (3D)', type: 'range',
+        min: 0, max: 2, step: 0.1, def: 1,
+        help: 'Wie stark das Auto raeumlich aufgebaut wird - wie bei den Haeusern.' },
       { key: 'pixelSnap', label: 'BILD EINRASTEN', type: 'toggle', def: true,
         help: 'Ganzzahlige Vergroesserung - ruhigeres Bild, dafuer schmale Raender.' },
       { key: 'parallax', label: 'GEBAEUDEHOEHE (3D)', type: 'range',

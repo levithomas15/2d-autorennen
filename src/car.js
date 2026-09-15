@@ -216,23 +216,21 @@ export class Car {
     g.restore();
   }
 
-  draw(g, ctl) {
+  // Raeder liegen auf dem Boden, die Karosserie kann darueber versetzt werden
+  drawWheels(g) {
     const s = this.spec;
-    const braking = ctl && (ctl.brake > 0 || ctl.handbrake > 0);
-    g.save();
-    g.translate(this.x, this.y);
-    g.rotate(this.heading);
-
-    // Raeder zuerst, die Karosserie deckt sie teilweise ab
     const ws = this.wheelSprite;
     const ww = ws.width / SS, wh = ws.height / SS;
     const fx = s.len * 0.30, rx = -s.len * 0.32, wy = s.wid * 0.5 - 0.3;
+    g.save();
+    g.translate(this.x, this.y);
+    g.rotate(this.heading);
     for (const [ox, oy, turn] of [[fx, -wy, 1], [fx, wy, 1], [rx, -wy, 0], [rx, wy, 0]]) {
       g.save();
       g.translate(ox, oy);
       if (turn) g.rotate(this.steer);
       g.drawImage(ws, -ww / 2, -wh / 2, ww, wh);
-      if (this.wheelSpin > 0.3) {          // Felge verwischt beim Durchdrehen
+      if (this.wheelSpin > 0.3) {
         g.globalAlpha = Math.min(0.6, this.wheelSpin);
         g.fillStyle = '#9a9ab0';
         g.fillRect(-ww / 2 + 0.6, -wh / 2 + 0.8, ww - 1.2, wh - 1.6);
@@ -240,16 +238,39 @@ export class Car {
       }
       g.restore();
     }
+    g.restore();
+  }
 
+  // Karosserie, wahlweise um (dx, dy) angehoben - so entsteht die Raeumlichkeit
+  drawBody(g, dx = 0, dy = 0, ctl = null) {
+    const s = this.spec;
+    const braking = ctl && (ctl.brake > 0 || ctl.handbrake > 0);
+    g.save();
+    g.translate(this.x + dx, this.y + dy);
+    g.rotate(this.heading);
     g.drawImage(this.sprite, -s.len / 2, -s.wid / 2, s.len, s.wid);
-
-    // Bremslichter
     if (braking) {
       g.fillStyle = '#ff5240';
       g.fillRect(-s.len / 2, -s.wid * 0.42, 1.2, s.wid * 0.22);
       g.fillRect(-s.len / 2, s.wid * 0.2, 1.2, s.wid * 0.22);
     }
     g.restore();
+  }
+
+  // Eckpunkte des Grundrisses in Weltkoordinaten
+  corners() {
+    const s = this.spec;
+    const cs = Math.cos(this.heading), sn = Math.sin(this.heading);
+    const hx = s.len / 2, hy = s.wid / 2;
+    return [[hx, -hy], [hx, hy], [-hx, hy], [-hx, -hy]].map(([lx, ly]) => ({
+      x: this.x + cs * lx - sn * ly,
+      y: this.y + sn * lx + cs * ly,
+    }));
+  }
+
+  draw(g, ctl) {
+    this.drawWheels(g);
+    this.drawBody(g, 0, 0, ctl);
   }
 }
 

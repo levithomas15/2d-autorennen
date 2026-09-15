@@ -81,6 +81,7 @@ export class World {
 
     this.hasWater = this.tiles.includes(T.WATER);
     this.collectBuildings();
+    this.collectBlocks();
     this.assignBuildingLooks();
     this.canvas = this.render();
     this.roofCanvas = this.renderRoofs();
@@ -177,27 +178,51 @@ export class World {
   isSolid(tx, ty) { return SOLID.has(this.get(tx, ty)); }
 
   // --------------------------------------------- Kollisionsrechtecke sammeln
-  collectBuildings() {
+  // Gleichartige Kacheln zu moeglichst wenigen Rechtecken zusammenfassen
+  mergeTiles(type) {
     const seen = new Uint8Array(this.w * this.h);
+    const out = [];
     for (let ty = 0; ty < this.h; ty++) {
       for (let tx = 0; tx < this.w; tx++) {
         const i = this.idx(tx, ty);
-        if (seen[i] || this.tiles[i] !== T.BUILDING) continue;
+        if (seen[i] || this.tiles[i] !== type) continue;
         let w = 0;
-        while (tx + w < this.w && this.get(tx + w, ty) === T.BUILDING && !seen[this.idx(tx + w, ty)]) w++;
+        while (tx + w < this.w && this.get(tx + w, ty) === type && !seen[this.idx(tx + w, ty)]) w++;
         let h = 0;
         outer: while (ty + h < this.h) {
           for (let k = 0; k < w; k++) {
             const j = this.idx(tx + k, ty + h);
-            if (this.tiles[j] !== T.BUILDING || seen[j]) break outer;
+            if (this.tiles[j] !== type || seen[j]) break outer;
           }
           h++;
         }
         for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) seen[this.idx(tx + x, ty + y)] = 1;
-        this.buildings.push({
+        out.push({
           x: tx * TILE, y: ty * TILE, w: w * TILE, h: h * TILE,
           cx: tx * TILE + w * TILE / 2, cy: ty * TILE + h * TILE / 2,
         });
+      }
+    }
+    return out;
+  }
+
+  collectBuildings() {
+    this.buildings = this.mergeTiles(T.BUILDING);
+  }
+
+  // Banden und Felsen sind ebenfalls Koerper - in der Ego-Sicht muessen sie
+  // Hoehe haben, sonst faehrt man auf eine gemalte Flaeche zu.
+  collectBlocks() {
+    this.blocks = [];
+    const kinds = [
+      { type: T.WALL, height: 12, roof: '#d8d8e2', wallA: '#c4453a', wallB: '#8f2f28' },
+      { type: T.CLIFF, height: 30, roof: '#2d2d36', wallA: '#22222a', wallB: '#191920' },
+    ];
+    for (const k of kinds) {
+      for (const r of this.mergeTiles(k.type)) {
+        this.blocks.push(Object.assign(r, {
+          height: k.height, roof: k.roof, wallA: k.wallA, wallB: k.wallB,
+        }));
       }
     }
   }
