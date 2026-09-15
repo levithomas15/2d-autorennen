@@ -44,20 +44,17 @@ body {
 #wheel { width: 100%; height: 100%; display: block; }
 
 #pedals {
-  position: absolute; right: 18px; bottom: 14px;
-  display: flex; align-items: flex-end; gap: 8px;
+  position: absolute; right: 16px; bottom: 12px;
   pointer-events: auto;
 }
-.pedal {
-  pointer-events: auto;
-  width: 56px; height: 112px;
+#pedalBox {
   display: block;
+  width: 230px; height: 150px;
   cursor: pointer; touch-action: none;
 }
-#pGas { width: 64px; }
 
 #handbrakeBox {
-  position: absolute; right: 216px; bottom: 14px;
+  position: absolute; right: 254px; bottom: 12px;
   pointer-events: auto;
 }
 .lever {
@@ -67,7 +64,7 @@ body {
 }
 
 #shifterWrap {
-  position: absolute; right: 18px; bottom: 142px;
+  position: absolute; right: 18px; bottom: 172px;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   pointer-events: auto;
 }
@@ -260,12 +257,11 @@ button.choice.on { background: #ffd96b; border-color: #ffd96b; color: #17111f; }
 
 @media (max-width: 680px) {
   #wheelBox { width: 118px; height: 118px; left: 10px; bottom: 10px; }
-  .pedal { width: 44px; height: 88px; }
-  #pGas { width: 50px; }
-  #pedals { right: 10px; bottom: 8px; gap: 5px; }
-  .lever { width: 58px; height: 78px; }
-  #handbrakeBox { right: 160px; bottom: 8px; }
-  #shifterWrap { right: 10px; bottom: 104px; }
+  #pedalBox { width: 168px; height: 110px; }
+  #pedals { right: 8px; bottom: 6px; }
+  .lever { width: 58px; height: 84px; }
+  #handbrakeBox { right: 182px; bottom: 6px; }
+  #shifterWrap { right: 8px; bottom: 124px; }
   #shifter { width: 46px; height: 62px; }
   .shiftBtn { width: 46px; }
   .brand { font-size: 15px; }
