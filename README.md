@@ -1,17 +1,43 @@
 # PIXEL DRIFT CITY
 
+**▶ Jetzt spielen: https://levithomas15.github.io/2d-autorennen/**
+
 Ein Top-Down-Drift-Simulator im Stil von GTA 1/2 – Vogelperspektive, Pixel-Optik,
 sechs prozedural erzeugte Strecken, Lenkrad, Pedale und optionale Gangschaltung.
 
 Reines HTML5 + Canvas + ES-Module. Keine Abhängigkeiten, kein Build-Schritt.
 
+![Innenstadt mit Häusern in 3D](media/screenshot-stadt.png)
+
+| Regen bei Nacht | Garage |
+| --- | --- |
+| ![Regen bei Nacht](media/screenshot-regen.png) | ![Garage](media/screenshot-garage.png) |
+
 ## Starten
+
+Online läuft es unter der Adresse oben. Lokal:
 
 ```bash
 # irgendein statischer Server (ES-Module brauchen http://, file:// reicht nicht)
 npx http-server -p 8080 .
 # dann http://localhost:8080 öffnen
 ```
+
+## Veröffentlichen
+
+`.github/workflows/pages.yml` stellt die Seite bei jedem Push auf den
+Standard-Branch zusammen und veröffentlicht sie über GitHub Pages. Der Workflow
+schaltet Pages beim ersten Lauf selbst frei, es ist also keine Einstellung von
+Hand nötig. Kopiert werden nur `index.html`, `style.css`, `src/` und `media/`.
+
+Eigene Domain: eine Datei `CNAME` mit dem Hostnamen (z. B. `drift.example.com`)
+im Repo-Wurzelverzeichnis anlegen – der Workflow übernimmt sie automatisch.
+Beim Domain-Anbieter zusätzlich einen CNAME-Eintrag auf
+`levithomas15.github.io` setzen.
+
+Wird der Standard-Branch später umbenannt oder auf `main` gewechselt, muss der
+Branch-Name in `.github/workflows/pages.yml` unter `on.push.branches`
+mitgeändert werden.
 
 ## Steuerung
 
@@ -210,6 +236,7 @@ schattiert und liegen umgefahren flach auf der Straße.
 | `src/light.js` | Dynamische Beleuchtung, Lichtkarte und Schein |
 | `src/audio.js` | Prozeduraler Motor-, Reifen- und Crash-Sound |
 | `src/font.js` | 3×5-Pixel-Font fürs HUD |
+| `.github/workflows/pages.yml` | Veröffentlichung auf GitHub Pages |
 
 Jede Karte wird aus einem festen Seed erzeugt und einmalig auf ein
 Offscreen-Canvas gerendert; pro Frame wird nur der sichtbare Ausschnitt kopiert.

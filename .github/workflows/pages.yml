@@ -1,0 +1,52 @@
+# Veroeffentlicht das Spiel auf GitHub Pages.
+# Die Seite ist statisch, es wird also nur kopiert - kein Build noetig.
+name: GitHub Pages
+
+on:
+  push:
+    branches: [claude/gta-drift-auto-simulator-0wa655]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Immer nur eine Veroeffentlichung gleichzeitig, laufende nicht abbrechen
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Pages vorbereiten
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Seite zusammenstellen
+        run: |
+          mkdir -p site
+          cp index.html style.css site/
+          cp -r src media site/
+          # verhindert, dass GitHub die Dateien durch Jekyll schickt
+          touch site/.nojekyll
+          # eigene Domain: Datei CNAME im Repo anlegen, sie wird uebernommen
+          if [ -f CNAME ]; then cp CNAME site/; fi
+
+      - name: Artefakt hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Veroeffentlichen
+        id: deployment
+        uses: actions/deploy-pages@v4
